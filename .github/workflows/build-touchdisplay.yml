@@ -36,14 +36,14 @@ jobs:
       - name: Build APK
         run: |
           gradle -p TouchDisplayAndroid :app:assembleDebug --no-daemon --stacktrace
-          cp TouchDisplayAndroid/app/build/outputs/apk/debug/app-debug.apk TouchDisplay-v1.4.apk
-          ls -lh TouchDisplay-v1.4.apk
+          cp TouchDisplayAndroid/app/build/outputs/apk/debug/app-debug.apk TouchDisplay-v1.5.apk
+          ls -lh TouchDisplay-v1.5.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TouchDisplay-Android-v1.4
-          path: TouchDisplay-v1.4.apk
+          name: TouchDisplay-Android-v1.5
+          path: TouchDisplay-v1.5.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -58,22 +58,22 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Apply v1.4 discovery, password and touch fixes
+      - name: Apply v1.5 right-click, quality and touch fixes
         shell: pwsh
-        run: ./TouchDisplayHost/patch-v1.4.ps1
+        run: ./TouchDisplayHost/patch-v1.5.ps1
 
       - name: Build single EXE
         shell: pwsh
         run: |
           dotnet restore TouchDisplayHost/TouchDisplayHost.csproj
           dotnet publish TouchDisplayHost/TouchDisplayHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o TouchDisplayHost/out
-          Copy-Item TouchDisplayHost/out/TouchDisplayHost.exe TouchDisplayHost-v1.4.exe
-          Get-Item TouchDisplayHost-v1.4.exe | Format-List Name,Length
+          Copy-Item TouchDisplayHost/out/TouchDisplayHost.exe TouchDisplayHost-v1.5.exe
+          Get-Item TouchDisplayHost-v1.5.exe | Format-List Name,Length
 
       - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
-          name: TouchDisplay-Windows-v1.4
-          path: TouchDisplayHost-v1.4.exe
+          name: TouchDisplay-Windows-v1.5
+          path: TouchDisplayHost-v1.5.exe
           if-no-files-found: error
           retention-days: 30
