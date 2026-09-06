@@ -33,20 +33,22 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Fix Android v1.5 long press naming
-        run: sed -i 's/cancelLongPress()/cancelLongPressGesture()/g' TouchDisplayAndroid/app/src/main/java/kz/pult/touchdisplay/MainActivity.kt
+      - name: Apply Android v1.7 fixes
+        run: |
+          sed -i 's/cancelLongPress()/cancelLongPressGesture()/g' TouchDisplayAndroid/app/src/main/java/kz/pult/touchdisplay/MainActivity.kt
+          python3 TouchDisplayAndroid/patch-v1.7.py
 
       - name: Build APK
         run: |
           gradle -p TouchDisplayAndroid :app:assembleDebug --no-daemon --stacktrace
-          cp TouchDisplayAndroid/app/build/outputs/apk/debug/app-debug.apk TouchDisplay-v1.5.apk
-          ls -lh TouchDisplay-v1.5.apk
+          cp TouchDisplayAndroid/app/build/outputs/apk/debug/app-debug.apk TouchDisplay-v1.7.apk
+          ls -lh TouchDisplay-v1.7.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TouchDisplay-Android-v1.5
-          path: TouchDisplay-v1.5.apk
+          name: TouchDisplay-Android-v1.7
+          path: TouchDisplay-v1.7.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -61,22 +63,22 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Apply v1.6 stale-host password fix
+      - name: Apply v1.7 password-aware pairing fix
         shell: pwsh
-        run: ./TouchDisplayHost/patch-v1.6.ps1
+        run: ./TouchDisplayHost/patch-v1.7.ps1
 
       - name: Build single EXE
         shell: pwsh
         run: |
           dotnet restore TouchDisplayHost/TouchDisplayHost.csproj
           dotnet publish TouchDisplayHost/TouchDisplayHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o TouchDisplayHost/out
-          Copy-Item TouchDisplayHost/out/TouchDisplayHost.exe TouchDisplayHost-v1.6.exe
-          Get-Item TouchDisplayHost-v1.6.exe | Format-List Name,Length
+          Copy-Item TouchDisplayHost/out/TouchDisplayHost.exe TouchDisplayHost-v1.7.exe
+          Get-Item TouchDisplayHost-v1.7.exe | Format-List Name,Length
 
       - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
-          name: TouchDisplay-Windows-v1.6
-          path: TouchDisplayHost-v1.6.exe
+          name: TouchDisplay-Windows-v1.7
+          path: TouchDisplayHost-v1.7.exe
           if-no-files-found: error
           retention-days: 30
