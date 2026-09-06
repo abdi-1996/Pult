@@ -1,0 +1,75 @@
+name: Build TouchDisplay APK + EXE
+
+on:
+  push:
+    branches: [touchdisplay-v1]
+    paths:
+      - 'TouchDisplayAndroid/**'
+      - 'TouchDisplayHost/**'
+      - '.github/workflows/build-touchdisplay.yml'
+  workflow_dispatch:
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 35 SDK
+        run: yes | sdkmanager --licenses >/dev/null || true; sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build APK
+        run: |
+          gradle -p TouchDisplayAndroid :app:assembleDebug --no-daemon --stacktrace
+          cp TouchDisplayAndroid/app/build/outputs/apk/debug/app-debug.apk TouchDisplay-v1.apk
+          ls -lh TouchDisplay-v1.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TouchDisplay-Android-v1
+          path: TouchDisplay-v1.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  windows:
+    name: Windows EXE
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build single EXE
+        shell: pwsh
+        run: |
+          dotnet restore TouchDisplayHost/TouchDisplayHost.csproj
+          dotnet publish TouchDisplayHost/TouchDisplayHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o TouchDisplayHost/out
+          Copy-Item TouchDisplayHost/out/TouchDisplayHost.exe TouchDisplayHost-v1.exe
+          Get-Item TouchDisplayHost-v1.exe | Format-List Name,Length
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: TouchDisplay-Windows-v1
+          path: TouchDisplayHost-v1.exe
+          if-no-files-found: error
+          retention-days: 30
