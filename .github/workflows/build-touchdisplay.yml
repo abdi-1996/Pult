@@ -36,14 +36,14 @@ jobs:
       - name: Build APK
         run: |
           gradle -p TouchDisplayAndroid :app:assembleDebug --no-daemon --stacktrace
-          cp TouchDisplayAndroid/app/build/outputs/apk/debug/app-debug.apk TouchDisplay-v1.2.apk
-          ls -lh TouchDisplay-v1.2.apk
+          cp TouchDisplayAndroid/app/build/outputs/apk/debug/app-debug.apk TouchDisplay-v1.3.apk
+          ls -lh TouchDisplay-v1.3.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TouchDisplay-Android-v1.2
-          path: TouchDisplay-v1.2.apk
+          name: TouchDisplay-Android-v1.3
+          path: TouchDisplay-v1.3.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -58,7 +58,7 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Apply v1.2 touch fixes
+      - name: Apply v1.3 touch fixes
         shell: pwsh
         run: ./TouchDisplayHost/patch-v1.2.ps1
 
@@ -67,13 +67,13 @@ jobs:
         run: |
           dotnet restore TouchDisplayHost/TouchDisplayHost.csproj
           dotnet publish TouchDisplayHost/TouchDisplayHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o TouchDisplayHost/out
-          Copy-Item TouchDisplayHost/out/TouchDisplayHost.exe TouchDisplayHost-v1.2.exe
-          Get-Item TouchDisplayHost-v1.2.exe | Format-List Name,Length
+          Copy-Item TouchDisplayHost/out/TouchDisplayHost.exe TouchDisplayHost-v1.3.exe
+          Get-Item TouchDisplayHost-v1.3.exe | Format-List Name,Length
 
       - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
-          name: TouchDisplay-Windows-v1.2
-          path: TouchDisplayHost-v1.2.exe
+          name: TouchDisplay-Windows-v1.3
+          path: TouchDisplayHost-v1.3.exe
           if-no-files-found: error
           retention-days: 30
