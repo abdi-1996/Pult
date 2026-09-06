@@ -1,6 +1,7 @@
 package kz.pult.touchdisplay
 
 import android.app.Activity
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -8,6 +9,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Bundle
+import android.text.InputType
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -22,18 +24,48 @@ import java.io.BufferedOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.IOException
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.net.NetworkInterface
 import java.net.Socket
+import java.net.SocketTimeoutException
+import java.util.LinkedHashSet
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.min
 
 class MainActivity : Activity() {
+    companion object {
+        private const val TCP_PORT = 59432
+        private const val DISCOVERY_PORT = 59431
+        private const val DISCOVERY_REQUEST = "TDISCOVER14"
+        private const val DISCOVERY_RESPONSE = "TDHOST14"
+    }
+
+    private data class HostInfo(
+        val lanAddress: String,
+        val port: Int,
+        val tailscaleAddress: String?
+    )
+
+    private data class OpenConnection(
+        val socket: Socket,
+        val input: DataInputStream,
+        val output: DataOutputStream,
+        val host: String
+    )
+
     private var socket: Socket? = null
     private var input: DataInputStream? = null
     private var output: DataOutputStream? = null
     private var remoteView: RemoteView? = null
     private val touchExecutor = Executors.newSingleThreadExecutor()
+    private val latestFrame = AtomicReference<ByteArray?>(null)
+    private val prefs by lazy { getSharedPreferences("touchdisplay_v14", Context.MODE_PRIVATE) }
     @Volatile private var connected = false
+    @Volatile private var decoderRunning = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,6 +88,8 @@ class MainActivity : Activity() {
 
     private fun showConnectScreen(message: String? = null) {
         connected = false
+        decoderRunning = false
+        latestFrame.set(null)
         enterImmersive()
 
         val root = LinearLayout(this).apply {
@@ -66,48 +100,55 @@ class MainActivity : Activity() {
         }
 
         val title = TextView(this).apply {
-            text = "TouchDisplay v1"
+            text = "TouchDisplay v1.4"
             textSize = 30f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
         }
-        root.addView(title, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 20 })
+        root.addView(title, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 16 })
 
         val subtitle = TextView(this).apply {
-            text = "Планшет как сенсорный экран Windows\nLAN / Wi‑Fi / Tailscale"
-            textSize = 16f
+            text = "Введите только пароль\nПК найдётся автоматически"
+            textSize = 17f
             setTextColor(Color.LTGRAY)
             gravity = Gravity.CENTER
         }
         root.addView(subtitle, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 24 })
 
-        val host = field("IP или Tailscale-имя ПК", "")
-        val port = field("Порт", "59432")
-        val pin = field("PIN из TouchDisplay Host", "")
-        root.addView(host, fieldParams())
-        root.addView(port, fieldParams())
-        root.addView(pin, fieldParams())
+        val password = EditText(this).apply {
+            hint = "Пароль из TouchDisplay Host"
+            setHintTextColor(Color.GRAY)
+            setTextColor(Color.WHITE)
+            textSize = 18f
+            setSingleLine(true)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setBackgroundColor(Color.rgb(35, 40, 50))
+            setPadding(22, 8, 22, 8)
+        }
+        root.addView(password, LinearLayout.LayoutParams(620, 62).apply { bottomMargin = 14 })
 
         val connect = Button(this).apply {
-            text = "ПОДКЛЮЧИТЬСЯ"
+            text = "ВОЙТИ"
             textSize = 17f
             setOnClickListener {
-                val h = host.text.toString().trim()
-                val p = port.text.toString().toIntOrNull() ?: 59432
-                val code = pin.text.toString().trim()
-                if (h.isBlank() || code.isBlank()) {
-                    Toast.makeText(this@MainActivity, "Введите адрес ПК и PIN", Toast.LENGTH_SHORT).show()
+                val value = password.text.toString().trim()
+                if (value.isBlank()) {
+                    Toast.makeText(this@MainActivity, "Введите пароль", Toast.LENGTH_SHORT).show()
                 } else {
                     isEnabled = false
-                    text = "Подключение…"
-                    connect(h, p, code)
+                    text = "Поиск ПК…"
+                    connectWithPassword(value)
                 }
             }
         }
-        root.addView(connect, LinearLayout.LayoutParams(520, -2).apply { topMargin = 16 })
+        root.addView(connect, LinearLayout.LayoutParams(520, -2))
 
         val status = TextView(this).apply {
-            text = message ?: "Для удалённого доступа укажите адрес Tailscale 100.x.x.x или MagicDNS-имя."
+            text = message ?: if (prefs.contains("last_lan") || prefs.contains("last_tail")) {
+                "LAN / Wi‑Fi / Tailscale • сохранённый ПК"
+            } else {
+                "Первый вход: планшет и ПК должны быть в одной Wi‑Fi сети"
+            }
             textSize = 14f
             setTextColor(if (message == null) Color.GRAY else Color.rgb(255, 180, 100))
             gravity = Gravity.CENTER
@@ -116,69 +157,193 @@ class MainActivity : Activity() {
         setContentView(root)
     }
 
-    private fun field(hint: String, value: String): EditText = EditText(this).apply {
-        this.hint = hint
-        setHintTextColor(Color.GRAY)
-        setTextColor(Color.WHITE)
-        setText(value)
-        textSize = 17f
-        setSingleLine(true)
-        setBackgroundColor(Color.rgb(35, 40, 50))
-        setPadding(22, 8, 22, 8)
-    }
-
-    private fun fieldParams() = LinearLayout.LayoutParams(620, 58).apply { bottomMargin = 10 }
-
-    private fun connect(host: String, port: Int, pin: String) {
+    private fun connectWithPassword(password: String) {
         Thread {
+            var lastError: String? = null
             try {
                 closeConnection()
-                val s = Socket()
-                s.tcpNoDelay = true
-                s.keepAlive = true
-                s.connect(InetSocketAddress(host, port), 7000)
-                val din = DataInputStream(BufferedInputStream(s.getInputStream(), 512 * 1024))
-                val dout = DataOutputStream(BufferedOutputStream(s.getOutputStream(), 64 * 1024))
 
-                val pinBytes = pin.toByteArray(Charsets.UTF_8)
-                dout.write("TD01".toByteArray(Charsets.US_ASCII))
-                dout.writeInt(pinBytes.size)
-                dout.write(pinBytes)
-                dout.flush()
+                val candidates = LinkedHashSet<Pair<String, Int>>()
 
-                val accepted = din.readUnsignedByte()
-                if (accepted != 1) throw IOException("Неверный PIN")
-
-                socket = s
-                input = din
-                output = dout
-                connected = true
-
-                runOnUiThread {
-                    val view = RemoteView()
-                    remoteView = view
-                    setContentView(view)
-                    enterImmersive()
+                // Discover first when we are at home. This also refreshes a changed DHCP address.
+                val discovered = discoverHost()
+                if (discovered != null) {
+                    candidates.add(discovered.lanAddress to discovered.port)
+                    discovered.tailscaleAddress?.takeIf { it.isNotBlank() }?.let {
+                        candidates.add(it to discovered.port)
+                    }
+                    prefs.edit()
+                        .putString("last_lan", discovered.lanAddress)
+                        .putString("last_tail", discovered.tailscaleAddress ?: "")
+                        .putInt("last_port", discovered.port)
+                        .apply()
                 }
 
-                readFrames(din)
+                val savedPort = prefs.getInt("last_port", TCP_PORT)
+                prefs.getString("last_lan", null)?.takeIf { !it.isNullOrBlank() }?.let {
+                    candidates.add(it to savedPort)
+                }
+                prefs.getString("last_tail", null)?.takeIf { !it.isNullOrBlank() }?.let {
+                    candidates.add(it to savedPort)
+                }
+
+                if (candidates.isEmpty()) {
+                    throw IOException("ПК не найден. Для первого входа подключите планшет и ПК к одной Wi‑Fi сети.")
+                }
+
+                var opened: OpenConnection? = null
+                for ((host, port) in candidates) {
+                    try {
+                        opened = openConnection(host, port, password)
+                        break
+                    } catch (e: Exception) {
+                        lastError = e.message ?: e.javaClass.simpleName
+                    }
+                }
+
+                val connection = opened ?: throw IOException(lastError ?: "Не удалось подключиться к ПК")
+                startSession(connection)
             } catch (e: Exception) {
-                val msg = e.message ?: e.javaClass.simpleName
+                val msg = e.message ?: lastError ?: e.javaClass.simpleName
                 closeConnection()
                 runOnUiThread { showConnectScreen("Ошибка подключения: $msg") }
             }
         }.start()
     }
 
-    private fun readFrames(din: DataInputStream) {
-        while (connected) {
-            val length = din.readInt()
-            if (length <= 0 || length > 20_000_000) throw IOException("Некорректный кадр")
-            val bytes = ByteArray(length)
-            din.readFully(bytes)
-            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                ?: throw IOException("Не удалось декодировать кадр")
-            remoteView?.setFrame(bitmap)
+    private fun openConnection(host: String, port: Int, password: String): OpenConnection {
+        val s = Socket()
+        try {
+            s.tcpNoDelay = true
+            s.keepAlive = true
+            s.receiveBufferSize = 2 * 1024 * 1024
+            s.sendBufferSize = 64 * 1024
+            s.connect(InetSocketAddress(host, port), 2200)
+
+            val din = DataInputStream(BufferedInputStream(s.getInputStream(), 2 * 1024 * 1024))
+            val dout = DataOutputStream(BufferedOutputStream(s.getOutputStream(), 64 * 1024))
+
+            val passwordBytes = password.toByteArray(Charsets.UTF_8)
+            dout.write("TD01".toByteArray(Charsets.US_ASCII))
+            dout.writeInt(passwordBytes.size)
+            dout.write(passwordBytes)
+            dout.flush()
+
+            val accepted = din.readUnsignedByte()
+            if (accepted != 1) throw IOException("Неверный пароль")
+            return OpenConnection(s, din, dout, host)
+        } catch (e: Exception) {
+            try { s.close() } catch (_: Exception) { }
+            throw e
+        }
+    }
+
+    private fun startSession(connection: OpenConnection) {
+        socket = connection.socket
+        input = connection.input
+        output = connection.output
+        connected = true
+        latestFrame.set(null)
+
+        runOnUiThread {
+            val view = RemoteView()
+            remoteView = view
+            setContentView(view)
+            enterImmersive()
+        }
+
+        startDecoder()
+        readFramesFast(connection.input)
+    }
+
+    private fun startDecoder() {
+        decoderRunning = true
+        Thread {
+            while (connected && decoderRunning) {
+                val bytes = latestFrame.getAndSet(null)
+                if (bytes == null) {
+                    try { Thread.sleep(2) } catch (_: InterruptedException) { }
+                    continue
+                }
+
+                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                if (bitmap != null) {
+                    remoteView?.setFrame(bitmap)
+                }
+            }
+        }.apply {
+            name = "TouchDisplayDecoder"
+            priority = Thread.MAX_PRIORITY
+            start()
+        }
+    }
+
+    private fun readFramesFast(din: DataInputStream) {
+        try {
+            while (connected) {
+                val length = din.readInt()
+                if (length <= 0 || length > 24_000_000) throw IOException("Некорректный кадр")
+                val bytes = ByteArray(length)
+                din.readFully(bytes)
+                // Never let decode/render create a queue. Keep only the newest frame.
+                latestFrame.set(bytes)
+            }
+        } catch (e: Exception) {
+            if (connected) throw e
+        }
+    }
+
+    private fun discoverHost(): HostInfo? {
+        var udp: DatagramSocket? = null
+        return try {
+            udp = DatagramSocket().apply {
+                broadcast = true
+                soTimeout = 220
+            }
+
+            val payload = DISCOVERY_REQUEST.toByteArray(Charsets.US_ASCII)
+            val destinations = LinkedHashSet<InetAddress>()
+            destinations.add(InetAddress.getByName("255.255.255.255"))
+
+            try {
+                val interfaces = NetworkInterface.getNetworkInterfaces()
+                while (interfaces.hasMoreElements()) {
+                    val networkInterface = interfaces.nextElement()
+                    if (!networkInterface.isUp || networkInterface.isLoopback) continue
+                    for (address in networkInterface.interfaceAddresses) {
+                        address.broadcast?.let { destinations.add(it) }
+                    }
+                }
+            } catch (_: Exception) { }
+
+            for (destination in destinations) {
+                try {
+                    udp.send(DatagramPacket(payload, payload.size, destination, DISCOVERY_PORT))
+                } catch (_: Exception) { }
+            }
+
+            val deadline = System.currentTimeMillis() + 850
+            val buffer = ByteArray(1024)
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    val packet = DatagramPacket(buffer, buffer.size)
+                    udp.receive(packet)
+                    val text = String(packet.data, packet.offset, packet.length, Charsets.UTF_8)
+                    val parts = text.split('|')
+                    if (parts.size >= 3 && parts[0] == DISCOVERY_RESPONSE) {
+                        val port = parts[1].toIntOrNull() ?: TCP_PORT
+                        val tailscale = parts[2].takeIf { it.isNotBlank() }
+                        return HostInfo(packet.address.hostAddress ?: return null, port, tailscale)
+                    }
+                } catch (_: SocketTimeoutException) {
+                    // Keep listening until the short discovery deadline expires.
+                }
+            }
+            null
+        } catch (_: Exception) {
+            null
+        } finally {
+            try { udp?.close() } catch (_: Exception) { }
         }
     }
 
@@ -196,10 +361,8 @@ class MainActivity : Activity() {
                     dout.flush()
                 }
             } catch (_: Exception) {
-                if (connected) {
-                    closeConnection()
-                    runOnUiThread { showConnectScreen("Соединение потеряно") }
-                }
+                // Do not destroy the visible session because a touch write failed once.
+                // The video reader will close the session if the connection is actually gone.
             }
         }
     }
@@ -207,6 +370,8 @@ class MainActivity : Activity() {
     @Synchronized
     private fun closeConnection() {
         connected = false
+        decoderRunning = false
+        latestFrame.set(null)
         try { socket?.close() } catch (_: Exception) { }
         socket = null
         input = null
@@ -240,7 +405,11 @@ class MainActivity : Activity() {
         }
 
         fun setFrame(bitmap: Bitmap) {
+            val previous = frame
             frame = bitmap
+            if (previous != null && previous !== bitmap && !previous.isRecycled) {
+                // Let the GC reclaim old native bitmap memory without accumulating many frames.
+            }
             postInvalidateOnAnimation()
         }
 
