@@ -33,6 +33,9 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Fix Android v1.5 long press naming
+        run: sed -i 's/cancelLongPress()/cancelLongPressGesture()/g' TouchDisplayAndroid/app/src/main/java/kz/pult/touchdisplay/MainActivity.kt
+
       - name: Build APK
         run: |
           gradle -p TouchDisplayAndroid :app:assembleDebug --no-daemon --stacktrace
