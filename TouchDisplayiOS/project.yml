@@ -1,0 +1,39 @@
+name: TouchDisplay
+options:
+  bundleIdPrefix: kz.pult
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  TouchDisplay:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: TouchDisplay
+        CFBundleShortVersionString: "3.0"
+        CFBundleVersion: "3"
+        UILaunchScreen: {}
+        NSLocalNetworkUsageDescription: TouchDisplay ищет ваш Windows ПК в локальной сети для передачи экрана, касаний и аудио.
+        UISupportsDocumentBrowser: false
+        UIRequiresFullScreen: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kz.pult.touchdisplay
+        PRODUCT_NAME: TouchDisplay
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_VERSION: "5.0"
+        IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Automatic
