@@ -87,7 +87,7 @@ jobs:
           git clone --depth 1 --filter=blob:none --sparse https://github.com/microsoft/Windows-driver-samples.git driver-samples
           cd driver-samples
           git sparse-checkout set video/IndirectDisplay
-      - name: Customize as one TouchDisplay virtual monitor
+      - name: Customize as one TouchDisplay tablet monitor
         shell: pwsh
         run: |
           $p = 'driver-samples/video/IndirectDisplay/IddSampleDriver/Driver.cpp'
@@ -96,6 +96,16 @@ jobs:
           $t = $t.Replace('L"IddSample Device"', 'L"TouchDisplay Virtual Display"')
           $t = $t.Replace('L"Microsoft"', 'L"TouchDisplay"')
           $t = $t.Replace('L"IddSample Model"', 'L"Android Tablet Display"')
+          $t = $t.Replace('if (ConnectorIndex >= ARRAYSIZE(s_SampleMonitors))', 'if (true)')
+          $t = [regex]::Replace($t, 'static const struct IndirectSampleMonitor::SampleMonitorMode s_SampleDefaultModes\[\]\s*=\s*\{.*?\};', @'
+          static const struct IndirectSampleMonitor::SampleMonitorMode s_SampleDefaultModes[] =
+          {
+              { 2560, 1600, 60 },
+              { 1920, 1200, 60 },
+              { 1920, 1080, 60 },
+              { 1280, 800, 60 },
+          };
+          '@, [System.Text.RegularExpressions.RegexOptions]::Singleline)
           $needle = 'TargetModes.push_back(CreateIddCxTargetMode(2560, 1440, 60));'
           $repl = "TargetModes.push_back(CreateIddCxTargetMode(2560, 1600, 60));`r`n    TargetModes.push_back(CreateIddCxTargetMode(1920, 1200, 60));`r`n    TargetModes.push_back(CreateIddCxTargetMode(1280, 800, 60));`r`n    $needle"
           $t = $t.Replace($needle, $repl)
@@ -123,11 +133,22 @@ jobs:
           @'
           @echo off
           cd /d "%~dp0"
+          for %%C in (*.cer) do (
+            certutil -addstore -f Root "%%C"
+            certutil -addstore -f TrustedPublisher "%%C"
+          )
           for %%F in (*.inf) do pnputil /add-driver "%%F" /install
           for %%F in (*IddSampleApp*.exe) do start "TouchDisplay Display 2" /min "%%F"
           echo Open Windows Settings - System - Display and select Extend these displays.
           pause
           '@ | Set-Content TouchDisplay-Display2-Driver/Install-Driver-After-Reboot.cmd -Encoding ASCII
+          @'
+          @echo off
+          taskkill /IM IddSampleApp.exe /F >nul 2>&1
+          for %%F in (*.inf) do pnputil /delete-driver "%%~nxF" /uninstall /force
+          echo TouchDisplay virtual display stopped. You can disable test mode with: bcdedit /set testsigning off
+          pause
+          '@ | Set-Content TouchDisplay-Display2-Driver/Remove-Display2.cmd -Encoding ASCII
           Compress-Archive -Path TouchDisplay-Display2-Driver/* -DestinationPath TouchDisplay-Display2-Driver-v2-beta.zip -Force
       - name: Upload Display 2 driver
         uses: actions/upload-artifact@v4
