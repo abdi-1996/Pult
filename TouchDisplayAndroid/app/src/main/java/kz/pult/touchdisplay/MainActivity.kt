@@ -9,6 +9,8 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import android.view.Gravity
 import android.view.MotionEvent
@@ -42,6 +44,7 @@ class MainActivity : Activity() {
         private const val DISCOVERY_PORT = 59431
         private const val DISCOVERY_REQUEST = "TDISCOVER14"
         private const val DISCOVERY_RESPONSE = "TDHOST14"
+        private const val LONG_PRESS_MS = 550L
     }
 
     private data class HostInfo(
@@ -100,7 +103,7 @@ class MainActivity : Activity() {
         }
 
         val title = TextView(this).apply {
-            text = "TouchDisplay v1.4"
+            text = "TouchDisplay v1.5"
             textSize = 30f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
@@ -164,8 +167,6 @@ class MainActivity : Activity() {
                 closeConnection()
 
                 val candidates = LinkedHashSet<Pair<String, Int>>()
-
-                // Discover first when we are at home. This also refreshes a changed DHCP address.
                 val discovered = discoverHost()
                 if (discovered != null) {
                     candidates.add(discovered.lanAddress to discovered.port)
@@ -216,11 +217,11 @@ class MainActivity : Activity() {
         try {
             s.tcpNoDelay = true
             s.keepAlive = true
-            s.receiveBufferSize = 2 * 1024 * 1024
+            s.receiveBufferSize = 3 * 1024 * 1024
             s.sendBufferSize = 64 * 1024
             s.connect(InetSocketAddress(host, port), 2200)
 
-            val din = DataInputStream(BufferedInputStream(s.getInputStream(), 2 * 1024 * 1024))
+            val din = DataInputStream(BufferedInputStream(s.getInputStream(), 3 * 1024 * 1024))
             val dout = DataOutputStream(BufferedOutputStream(s.getOutputStream(), 64 * 1024))
 
             val passwordBytes = password.toByteArray(Charsets.UTF_8)
@@ -262,7 +263,7 @@ class MainActivity : Activity() {
             while (connected && decoderRunning) {
                 val bytes = latestFrame.getAndSet(null)
                 if (bytes == null) {
-                    try { Thread.sleep(2) } catch (_: InterruptedException) { }
+                    try { Thread.sleep(1) } catch (_: InterruptedException) { }
                     continue
                 }
 
@@ -282,10 +283,9 @@ class MainActivity : Activity() {
         try {
             while (connected) {
                 val length = din.readInt()
-                if (length <= 0 || length > 24_000_000) throw IOException("Некорректный кадр")
+                if (length <= 0 || length > 32_000_000) throw IOException("Некорректный кадр")
                 val bytes = ByteArray(length)
                 din.readFully(bytes)
-                // Never let decode/render create a queue. Keep only the newest frame.
                 latestFrame.set(bytes)
             }
         } catch (e: Exception) {
@@ -335,9 +335,7 @@ class MainActivity : Activity() {
                         val tailscale = parts[2].takeIf { it.isNotBlank() }
                         return HostInfo(packet.address.hostAddress ?: return null, port, tailscale)
                     }
-                } catch (_: SocketTimeoutException) {
-                    // Keep listening until the short discovery deadline expires.
-                }
+                } catch (_: SocketTimeoutException) { }
             }
             null
         } catch (_: Exception) {
@@ -360,10 +358,22 @@ class MainActivity : Activity() {
                     dout.writeFloat(ny)
                     dout.flush()
                 }
-            } catch (_: Exception) {
-                // Do not destroy the visible session because a touch write failed once.
-                // The video reader will close the session if the connection is actually gone.
-            }
+            } catch (_: Exception) { }
+        }
+    }
+
+    private fun sendRightClick(nx: Float, ny: Float) {
+        if (!connected) return
+        touchExecutor.execute {
+            try {
+                val dout = output ?: return@execute
+                synchronized(dout) {
+                    dout.writeByte(0x11)
+                    dout.writeFloat(nx)
+                    dout.writeFloat(ny)
+                    dout.flush()
+                }
+            } catch (_: Exception) { }
         }
     }
 
@@ -396,7 +406,16 @@ class MainActivity : Activity() {
     inner class RemoteView : View(this@MainActivity) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         private val frameRect = RectF()
+        private val handler = Handler(Looper.getMainLooper())
+        private val longPressSlop = 24f * resources.displayMetrics.density
         @Volatile private var frame: Bitmap? = null
+        private var longPressRunnable: Runnable? = null
+        private var longPressPointerId = -1
+        private var longPressStartX = 0f
+        private var longPressStartY = 0f
+        private var longPressNx = 0f
+        private var longPressNy = 0f
+        private var longPressTriggered = false
 
         init {
             setBackgroundColor(Color.BLACK)
@@ -405,11 +424,7 @@ class MainActivity : Activity() {
         }
 
         fun setFrame(bitmap: Bitmap) {
-            val previous = frame
             frame = bitmap
-            if (previous != null && previous !== bitmap && !previous.isRecycled) {
-                // Let the GC reclaim old native bitmap memory without accumulating many frames.
-            }
             postInvalidateOnAnimation()
         }
 
@@ -427,24 +442,101 @@ class MainActivity : Activity() {
 
         override fun onTouchEvent(event: MotionEvent): Boolean {
             if (frameRect.isEmpty) return true
+
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                MotionEvent.ACTION_DOWN -> {
                     val i = event.actionIndex
                     sendPointer(0, event, i)
+                    beginLongPress(event, i)
+                }
+                MotionEvent.ACTION_POINTER_DOWN -> {
+                    cancelLongPress()
+                    sendPointer(0, event, event.actionIndex)
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    for (i in 0 until event.pointerCount) sendPointer(1, event, i)
+                    if (!longPressTriggered) {
+                        maybeCancelLongPressForMovement(event)
+                        for (i in 0 until event.pointerCount) sendPointer(1, event, i)
+                    }
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+                MotionEvent.ACTION_UP -> {
                     val i = event.actionIndex
-                    sendPointer(2, event, i)
-                    if (event.actionMasked == MotionEvent.ACTION_UP) performClick()
+                    val id = event.getPointerId(i)
+                    cancelLongPressRunnable()
+                    if (!(longPressTriggered && id == longPressPointerId)) {
+                        sendPointer(2, event, i)
+                        performClick()
+                    }
+                    resetLongPressState()
+                }
+                MotionEvent.ACTION_POINTER_UP -> {
+                    val i = event.actionIndex
+                    val id = event.getPointerId(i)
+                    cancelLongPressRunnable()
+                    if (!(longPressTriggered && id == longPressPointerId)) {
+                        sendPointer(2, event, i)
+                    }
+                    resetLongPressState()
                 }
                 MotionEvent.ACTION_CANCEL -> {
-                    for (i in 0 until event.pointerCount) sendPointer(3, event, i)
+                    cancelLongPressRunnable()
+                    if (!longPressTriggered) {
+                        for (i in 0 until event.pointerCount) sendPointer(3, event, i)
+                    }
+                    resetLongPressState()
                 }
             }
             return true
+        }
+
+        private fun beginLongPress(event: MotionEvent, index: Int) {
+            cancelLongPressRunnable()
+            longPressPointerId = event.getPointerId(index)
+            longPressStartX = event.getX(index)
+            longPressStartY = event.getY(index)
+            longPressNx = ((longPressStartX - frameRect.left) / frameRect.width()).coerceIn(0f, 1f)
+            longPressNy = ((longPressStartY - frameRect.top) / frameRect.height()).coerceIn(0f, 1f)
+            longPressTriggered = false
+
+            val runnable = Runnable {
+                if (!connected || longPressPointerId < 0 || longPressTriggered) return@Runnable
+                longPressTriggered = true
+                sendTouch(3, longPressPointerId, longPressNx, longPressNy)
+                sendRightClick(longPressNx, longPressNy)
+                performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            }
+            longPressRunnable = runnable
+            handler.postDelayed(runnable, LONG_PRESS_MS)
+        }
+
+        private fun maybeCancelLongPressForMovement(event: MotionEvent) {
+            if (longPressPointerId < 0 || longPressRunnable == null) return
+            val index = event.findPointerIndex(longPressPointerId)
+            if (index < 0) {
+                cancelLongPress()
+                return
+            }
+            val dx = event.getX(index) - longPressStartX
+            val dy = event.getY(index) - longPressStartY
+            if (dx * dx + dy * dy > longPressSlop * longPressSlop) {
+                cancelLongPress()
+            }
+        }
+
+        private fun cancelLongPress() {
+            cancelLongPressRunnable()
+            if (!longPressTriggered) longPressPointerId = -1
+        }
+
+        private fun cancelLongPressRunnable() {
+            longPressRunnable?.let { handler.removeCallbacks(it) }
+            longPressRunnable = null
+        }
+
+        private fun resetLongPressState() {
+            cancelLongPressRunnable()
+            longPressPointerId = -1
+            longPressTriggered = false
         }
 
         private fun sendPointer(action: Int, event: MotionEvent, index: Int) {
