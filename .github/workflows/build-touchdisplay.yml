@@ -33,17 +33,47 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Apply v1.1 network guard
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('TouchDisplayAndroid/app/src/main/java/kz/pult/touchdisplay/MainActivity.kt')
+          s = p.read_text(encoding='utf-8')
+          old = '''                if (h.isBlank() || code.isBlank()) {
+                    Toast.makeText(this@MainActivity, "Введите адрес ПК и PIN", Toast.LENGTH_SHORT).show()
+                } else {
+                    isEnabled = false
+                    text = "Подключение…"
+                    connect(h, p, code)
+                }'''
+          new = '''                if (h.isBlank() || code.isBlank()) {
+                    Toast.makeText(this@MainActivity, "Введите адрес ПК и PIN", Toast.LENGTH_SHORT).show()
+                } else if (h.startsWith("169.254.")) {
+                    Toast.makeText(this@MainActivity, "169.254.x.x — служебный адрес Windows. Используйте LAN 192.168.x.x/10.x.x.x или Tailscale 100.x.x.x", Toast.LENGTH_LONG).show()
+                    isEnabled = true
+                    text = "ПОДКЛЮЧИТЬСЯ"
+                } else {
+                    isEnabled = false
+                    text = "Подключение…"
+                    connect(h, p, code)
+                }'''
+          if old not in s:
+              raise SystemExit('Android patch target not found')
+          p.write_text(s.replace(old, new), encoding='utf-8')
+          PY
+
       - name: Build APK
         run: |
           gradle -p TouchDisplayAndroid :app:assembleDebug --no-daemon --stacktrace
-          cp TouchDisplayAndroid/app/build/outputs/apk/debug/app-debug.apk TouchDisplay-v1.apk
-          ls -lh TouchDisplay-v1.apk
+          cp TouchDisplayAndroid/app/build/outputs/apk/debug/app-debug.apk TouchDisplay-v1.1.apk
+          ls -lh TouchDisplay-v1.1.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TouchDisplay-Android-v1
-          path: TouchDisplay-v1.apk
+          name: TouchDisplay-Android-v1.1
+          path: TouchDisplay-v1.1.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -58,18 +88,30 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Apply v1.1 LAN address fix
+        shell: pwsh
+        run: |
+          $path = 'TouchDisplayHost/Program.cs'
+          $text = Get-Content $path -Raw
+          $old = 'var local = all.FirstOrDefault(a => !IsTailscale(a));'
+          $new = 'var local = all.FirstOrDefault(a => !IsTailscale(a) && !a.ToString().StartsWith("169.254.", StringComparison.Ordinal));'
+          if (-not $text.Contains($old)) { throw 'Host patch target not found' }
+          $text = $text.Replace($old, $new)
+          $text = $text.Replace('TouchDisplay Host v1', 'TouchDisplay Host v1.1')
+          Set-Content -Path $path -Value $text -Encoding UTF8
+
       - name: Build single EXE
         shell: pwsh
         run: |
           dotnet restore TouchDisplayHost/TouchDisplayHost.csproj
           dotnet publish TouchDisplayHost/TouchDisplayHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o TouchDisplayHost/out
-          Copy-Item TouchDisplayHost/out/TouchDisplayHost.exe TouchDisplayHost-v1.exe
-          Get-Item TouchDisplayHost-v1.exe | Format-List Name,Length
+          Copy-Item TouchDisplayHost/out/TouchDisplayHost.exe TouchDisplayHost-v1.1.exe
+          Get-Item TouchDisplayHost-v1.1.exe | Format-List Name,Length
 
       - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
-          name: TouchDisplay-Windows-v1
-          path: TouchDisplayHost-v1.exe
+          name: TouchDisplay-Windows-v1.1
+          path: TouchDisplayHost-v1.1.exe
           if-no-files-found: error
           retention-days: 30
