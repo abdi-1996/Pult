@@ -33,36 +33,6 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Apply v1.1 network guard
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('TouchDisplayAndroid/app/src/main/java/kz/pult/touchdisplay/MainActivity.kt')
-          s = p.read_text(encoding='utf-8')
-          old = '''                if (h.isBlank() || code.isBlank()) {
-                    Toast.makeText(this@MainActivity, "Введите адрес ПК и PIN", Toast.LENGTH_SHORT).show()
-                } else {
-                    isEnabled = false
-                    text = "Подключение…"
-                    connect(h, p, code)
-                }'''
-          new = '''                if (h.isBlank() || code.isBlank()) {
-                    Toast.makeText(this@MainActivity, "Введите адрес ПК и PIN", Toast.LENGTH_SHORT).show()
-                } else if (h.startsWith("169.254.")) {
-                    Toast.makeText(this@MainActivity, "169.254.x.x — служебный адрес Windows. Используйте LAN 192.168.x.x/10.x.x.x или Tailscale 100.x.x.x", Toast.LENGTH_LONG).show()
-                    isEnabled = true
-                    text = "ПОДКЛЮЧИТЬСЯ"
-                } else {
-                    isEnabled = false
-                    text = "Подключение…"
-                    connect(h, p, code)
-                }'''
-          if old not in s:
-              raise SystemExit('Android patch target not found')
-          p.write_text(s.replace(old, new), encoding='utf-8')
-          PY
-
       - name: Build APK
         run: |
           gradle -p TouchDisplayAndroid :app:assembleDebug --no-daemon --stacktrace
