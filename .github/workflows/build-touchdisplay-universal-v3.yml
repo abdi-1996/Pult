@@ -1,0 +1,116 @@
+name: Build TouchDisplay v3 Universal
+
+on:
+  push:
+    branches: [touchdisplay-universal-v3]
+    paths:
+      - 'TouchDisplayAndroid/**'
+      - 'TouchDisplayHost/**'
+      - 'TouchDisplayiOS/**'
+      - '.github/workflows/build-touchdisplay-universal-v3.yml'
+  workflow_dispatch:
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android 35 SDK
+        run: yes | sdkmanager --licenses >/dev/null || true; sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Apply Android patches
+        run: |
+          python TouchDisplayAndroid/patch-v1.7.py
+          sed -i 's/cancelLongPress()/cancelLongPressGesture()/g' TouchDisplayAndroid/app/src/main/java/kz/pult/touchdisplay/MainActivity.kt
+          python TouchDisplayAndroid/patch-v2.py
+          python TouchDisplayAndroid/patch-v3.py
+      - name: Build APK
+        run: |
+          gradle -p TouchDisplayAndroid :app:assembleDebug --no-daemon --stacktrace
+          cp TouchDisplayAndroid/app/build/outputs/apk/debug/app-debug.apk TouchDisplay-Android-v3.apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TouchDisplay-Android-v3
+          path: TouchDisplay-Android-v3.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  ios:
+    name: iPhone + iPad IPA
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Apply iOS fixes
+        run: python3 TouchDisplayiOS/fix-v3.py
+      - name: Generate Xcode project
+        working-directory: TouchDisplayiOS
+        run: xcodegen generate
+      - name: Build universal iOS app
+        working-directory: TouchDisplayiOS
+        run: |
+          xcodebuild \
+            -project TouchDisplay.xcodeproj \
+            -scheme TouchDisplay \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            build
+      - name: Package IPA
+        working-directory: TouchDisplayiOS
+        run: |
+          rm -rf Payload
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/TouchDisplay.app Payload/
+          zip -qry TouchDisplay-iPhone-iPad-v3.ipa Payload
+          ls -lh TouchDisplay-iPhone-iPad-v3.ipa
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: TouchDisplay-iPhone-iPad-v3
+          path: TouchDisplayiOS/TouchDisplay-iPhone-iPad-v3.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+  windows:
+    name: One Windows Host EXE
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Apply universal host patches
+        shell: pwsh
+        run: ./TouchDisplayHost/patch-v3.ps1
+      - name: Build one self-contained EXE
+        shell: pwsh
+        run: |
+          dotnet restore TouchDisplayHost/TouchDisplayHost.csproj
+          dotnet publish TouchDisplayHost/TouchDisplayHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o TouchDisplayHost/out
+          Copy-Item TouchDisplayHost/out/TouchDisplayHost.exe TouchDisplayHost-v3.exe
+          Get-Item TouchDisplayHost-v3.exe | Format-List Name,Length
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: TouchDisplay-Windows-Host-v3
+          path: TouchDisplayHost-v3.exe
+          if-no-files-found: error
+          retention-days: 30
