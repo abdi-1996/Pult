@@ -10,7 +10,7 @@ final class UdpVideoReceiver {
     static let headerSize = 20
     static let payloadSize = 1160
 
-    let localPort: Int
+    private(set) var localPort: Int = 0
 
     private let fd: Int32
     private let stateLock = NSLock()
@@ -26,12 +26,12 @@ final class UdpVideoReceiver {
 
         var receiveBuffer: Int32 = 4 * 1024 * 1024
         _ = withUnsafePointer(to: &receiveBuffer) {
-            setsockopt(fd, SOL_SOCKET, SO_RCVBUF, $0, socklen_t(MemoryLayout<Int32>.size))
+            setsockopt(socketFd, SOL_SOCKET, SO_RCVBUF, $0, socklen_t(MemoryLayout<Int32>.size))
         }
 
         var timeout = timeval(tv_sec: 0, tv_usec: 250_000)
         _ = withUnsafePointer(to: &timeout) {
-            setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, $0, socklen_t(MemoryLayout<timeval>.size))
+            setsockopt(socketFd, SOL_SOCKET, SO_RCVTIMEO, $0, socklen_t(MemoryLayout<timeval>.size))
         }
 
         var address = sockaddr_in()
@@ -42,11 +42,11 @@ final class UdpVideoReceiver {
 
         let bindResult = withUnsafePointer(to: &address) { ptr in
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
-                Darwin.bind(fd, sa, socklen_t(MemoryLayout<sockaddr_in>.size))
+                Darwin.bind(socketFd, sa, socklen_t(MemoryLayout<sockaddr_in>.size))
             }
         }
         guard bindResult == 0 else {
-            Darwin.close(fd)
+            Darwin.close(socketFd)
             throw TouchDisplayError.connection("Не удалось открыть UDP порт")
         }
 
@@ -54,11 +54,11 @@ final class UdpVideoReceiver {
         var length = socklen_t(MemoryLayout<sockaddr_in>.size)
         let nameResult = withUnsafeMutablePointer(to: &bound) { ptr in
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
-                Darwin.getsockname(fd, sa, &length)
+                Darwin.getsockname(socketFd, sa, &length)
             }
         }
         guard nameResult == 0 else {
-            Darwin.close(fd)
+            Darwin.close(socketFd)
             throw TouchDisplayError.connection("Не удалось определить UDP порт")
         }
         localPort = Int(UInt16(bigEndian: bound.sin_port))
@@ -201,7 +201,6 @@ final class UdpVideoReceiver {
                                 completed += 1
                                 decoder.submit(Data(assembly.bytes))
 
-                                // Any much older incomplete frames are stale now.
                                 let stale = assemblies.keys.filter { $0 < frameId }
                                 for key in stale {
                                     if assemblies.removeValue(forKey: key) != nil { dropped += 1 }
@@ -209,7 +208,6 @@ final class UdpVideoReceiver {
                             }
                         }
 
-                        // Bound memory and latency even under severe packet loss.
                         if assemblies.count > 3 {
                             let keys = assemblies.keys.sorted()
                             for key in keys.prefix(assemblies.count - 3) {
@@ -266,7 +264,7 @@ private final class LatestJpegDecoder {
 
     func submit(_ data: Data) {
         lock.lock()
-        latest = data // replace stale compressed frame immediately
+        latest = data
         if working {
             lock.unlock()
             return
