@@ -124,8 +124,8 @@ $newStream = @'
 if (-not $text.Contains($oldStream)) { throw 'v3.1 stream patch target not found' }
 $text = $text.Replace($oldStream, $newStream)
 
-$oldReceiveSig = '    private static async Task ReceiveInputAsync(NetworkStream stream, CancellationToken token)'
-$newReceiveSig = '    private static async Task ReceiveInputAsync(NetworkStream stream, ClientDisplayProfile profile, CancellationToken token)'
+$oldReceiveSig = '    private async Task ReceiveInputAsync(NetworkStream stream, CancellationToken token)'
+$newReceiveSig = '    private async Task ReceiveInputAsync(NetworkStream stream, ClientDisplayProfile profile, CancellationToken token)'
 if (-not $text.Contains($oldReceiveSig)) { throw 'v3.1 receive signature target not found' }
 $text = $text.Replace($oldReceiveSig, $newReceiveSig)
 
