@@ -1,4 +1,4 @@
-name: Build TouchDisplay v3 Universal
+name: Build TouchDisplay v3.1 Adaptive iOS
 
 on:
   push:
@@ -12,7 +12,7 @@ on:
 
 jobs:
   android:
-    name: Android APK
+    name: Android APK (compatible v3)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,14 +48,16 @@ jobs:
           retention-days: 30
 
   ios:
-    name: iPhone + iPad IPA
+    name: iPhone + iPad Adaptive IPA v3.1
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Apply iOS fixes
-        run: python3 TouchDisplayiOS/fix-v3.py
+        run: |
+          python3 TouchDisplayiOS/fix-v3.py
+          python3 TouchDisplayiOS/fix-v3.1.py
       - name: Generate Xcode project
         working-directory: TouchDisplayiOS
         run: xcodegen generate
@@ -78,18 +80,18 @@ jobs:
           rm -rf Payload
           mkdir Payload
           cp -R build/Build/Products/Release-iphoneos/TouchDisplay.app Payload/
-          zip -qry TouchDisplay-iPhone-iPad-v3.ipa Payload
-          ls -lh TouchDisplay-iPhone-iPad-v3.ipa
+          zip -qry TouchDisplay-iPhone-iPad-v3.1.ipa Payload
+          ls -lh TouchDisplay-iPhone-iPad-v3.1.ipa
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: TouchDisplay-iPhone-iPad-v3
-          path: TouchDisplayiOS/TouchDisplay-iPhone-iPad-v3.ipa
+          name: TouchDisplay-iPhone-iPad-v3.1
+          path: TouchDisplayiOS/TouchDisplay-iPhone-iPad-v3.1.ipa
           if-no-files-found: error
           retention-days: 30
 
   windows:
-    name: One Windows Host EXE
+    name: Universal Windows Host v3.1
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -97,20 +99,20 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Apply universal host patches
+      - name: Apply adaptive host patches
         shell: pwsh
-        run: ./TouchDisplayHost/patch-v3.ps1
+        run: ./TouchDisplayHost/patch-v3.1.ps1
       - name: Build one self-contained EXE
         shell: pwsh
         run: |
           dotnet restore TouchDisplayHost/TouchDisplayHost.csproj
           dotnet publish TouchDisplayHost/TouchDisplayHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o TouchDisplayHost/out
-          Copy-Item TouchDisplayHost/out/TouchDisplayHost.exe TouchDisplayHost-v3.exe
-          Get-Item TouchDisplayHost-v3.exe | Format-List Name,Length
+          Copy-Item TouchDisplayHost/out/TouchDisplayHost.exe TouchDisplayHost-v3.1.exe
+          Get-Item TouchDisplayHost-v3.1.exe | Format-List Name,Length
       - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
-          name: TouchDisplay-Windows-Host-v3
-          path: TouchDisplayHost-v3.exe
+          name: TouchDisplay-Windows-Host-v3.1
+          path: TouchDisplayHost-v3.1.exe
           if-no-files-found: error
           retention-days: 30
