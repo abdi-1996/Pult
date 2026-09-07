@@ -1,7 +1,17 @@
 import SwiftUI
+import UIKit
+
+final class TouchDisplayAppDelegate: NSObject, UIApplicationDelegate {
+    static var orientationLock: UIInterfaceOrientationMask = .allButUpsideDown
+
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        Self.orientationLock
+    }
+}
 
 @main
 struct TouchDisplayApp: App {
+    @UIApplicationDelegateAdaptor(TouchDisplayAppDelegate.self) private var appDelegate
     @StateObject private var model = TouchDisplayModel()
 
     var body: some Scene {
@@ -43,14 +53,14 @@ struct LoginView: View {
                         .font(.system(size: proxy.size.width > 700 ? 60 : 46, weight: .light))
                         .foregroundStyle(.white.opacity(0.92))
 
-                    Text("TouchDisplay v3")
+                    Text("TouchDisplay v3.1")
                         .font(.system(size: proxy.size.width > 700 ? 38 : 31, weight: .medium))
 
                     Text(UIDevice.current.userInterfaceIdiom == .pad ? "iPad как сенсорный экран Windows" : "iPhone как сенсорный экран Windows")
                         .font(.system(size: 16))
                         .foregroundStyle(.secondary)
 
-                    Text("Screen • Touch • Audio • LAN / Tailscale")
+                    Text("Adaptive Display • Touch • Audio • LAN / Tailscale")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
 
@@ -119,7 +129,7 @@ struct LoginView: View {
                         .padding(.horizontal, 24)
 
                     Spacer()
-                    Text("Один TouchDisplayHost.exe работает с Android, iPhone и iPad")
+                    Text("Экран автоматически адаптируется под разрешение устройства")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary.opacity(0.75))
                         .padding(.bottom, 14)
@@ -173,5 +183,22 @@ struct RemoteScreen: View {
         }
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
+        .onAppear { lockLandscape() }
+        .onDisappear { unlockOrientation() }
+    }
+
+    private func lockLandscape() {
+        TouchDisplayAppDelegate.orientationLock = .landscape
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
+        scene.windows.first(where: { $0.isKeyWindow })?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+        if #available(iOS 16.0, *) {
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscape)) { _ in }
+        }
+    }
+
+    private func unlockOrientation() {
+        TouchDisplayAppDelegate.orientationLock = .allButUpsideDown
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
+        scene.windows.first(where: { $0.isKeyWindow })?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
     }
 }
