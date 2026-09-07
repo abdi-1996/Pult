@@ -1,4 +1,4 @@
-name: Build TouchDisplay v3.2 Portrait iOS
+name: Build TouchDisplay v3.3 Fullscreen iOS
 
 on:
   push:
@@ -48,7 +48,7 @@ jobs:
           retention-days: 30
 
   ios:
-    name: iPhone + iPad Portrait/Adaptive IPA v3.2
+    name: iPhone + iPad Fullscreen/Stable IPA v3.3
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +59,7 @@ jobs:
           python3 TouchDisplayiOS/fix-v3.py
           python3 TouchDisplayiOS/fix-v3.1.py
           python3 TouchDisplayiOS/fix-v3.2.py
+          python3 TouchDisplayiOS/fix-v3.3.py
       - name: Generate Xcode project
         working-directory: TouchDisplayiOS
         run: xcodegen generate
@@ -81,13 +82,13 @@ jobs:
           rm -rf Payload
           mkdir Payload
           cp -R build/Build/Products/Release-iphoneos/TouchDisplay.app Payload/
-          zip -qry TouchDisplay-iPhone-iPad-v3.2.ipa Payload
-          ls -lh TouchDisplay-iPhone-iPad-v3.2.ipa
+          zip -qry TouchDisplay-iPhone-iPad-v3.3.ipa Payload
+          ls -lh TouchDisplay-iPhone-iPad-v3.3.ipa
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: TouchDisplay-iPhone-iPad-v3.2
-          path: TouchDisplayiOS/TouchDisplay-iPhone-iPad-v3.2.ipa
+          name: TouchDisplay-iPhone-iPad-v3.3
+          path: TouchDisplayiOS/TouchDisplay-iPhone-iPad-v3.3.ipa
           if-no-files-found: error
           retention-days: 30
 
