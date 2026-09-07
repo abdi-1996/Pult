@@ -6,6 +6,8 @@ text = text.replace('candidates.append((manual, videoPort))', 'candidates.append
 text = text.replace('let p = savedPort > 0 ? savedPort : videoPort', 'let p = savedPort > 0 ? savedPort : 59432')
 text = text.replace('let s = try BlockingSocket(host: host, port: self.audioPort)', 'let s = try BlockingSocket(host: host, port: 59434)')
 text = text.replace('address.sin_port = discoveryPort.bigEndian', 'address.sin_port = UInt16(59431).bigEndian')
+text = text.replace('var senderLen = socklen_t(MemoryLayout<sockaddr_in>.size)\n        let count = buffer.withUnsafeMutableBytes', 'var senderLen = socklen_t(MemoryLayout<sockaddr_in>.size)\n        let bufferCount = buffer.count\n        let count = buffer.withUnsafeMutableBytes')
+text = text.replace('Darwin.recvfrom(fd, base, buffer.count, 0, sa, &senderLen)', 'Darwin.recvfrom(fd, base, bufferCount, 0, sa, &senderLen)')
 
 old = '''    nonisolated private func readFrames(socket: BlockingSocket) {
         do {
