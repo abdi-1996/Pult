@@ -1,8 +1,8 @@
 from pathlib import Path
 
 # v3.3: fill the entire iPhone/iPad display (no letterbox bars), keep touch
-# coordinates aligned with the cropped image, and fix the video reader so it
-# stays alive for the whole connected session instead of stopping after one frame.
+# coordinates aligned with the cropped image, and harden the video reader so a
+# stale socket cannot tear down a newer active session.
 
 # --- Video session stability ---
 network_path = Path('TouchDisplayiOS/Sources/NetworkClient.swift')
@@ -11,30 +11,18 @@ text = network_path.read_text(encoding='utf-8')
 old_reader = '''    nonisolated private func readFrames(socket: BlockingSocket) {
         do {
             while true {
-                autoreleasepool {
-                    do {
-                        let length = try socket.readInt32BE()
-                        guard length > 0 && length < 24_000_000 else {
-                            throw TouchDisplayError.protocolError("Некорректный видеокадр")
-                        }
-                        let data = try socket.readExact(length)
-                        guard let image = UIImage(data: data) else { return }
-                        Task { @MainActor [weak self] in self?.frame = image }
-                    } catch {
-                        Task { @MainActor [weak self] in self?.handleDisconnect(error) }
-                    }
+                let length = try socket.readInt32BE()
+                guard length > 0 && length < 24_000_000 else {
+                    throw TouchDisplayError.protocolError("Некорректный видеокадр")
                 }
-                if socket !== self.currentVideoSocketUnsafe() { break }
+                let data = try socket.readExact(length)
+                if let image = UIImage(data: data) {
+                    Task { @MainActor [weak self] in self?.frame = image }
+                }
             }
         } catch {
             Task { @MainActor [weak self] in self?.handleDisconnect(error) }
         }
-    }
-
-    nonisolated private func currentVideoSocketUnsafe() -> BlockingSocket? {
-        // Session identity is checked on the main actor by disconnect lifecycle; keeping this helper
-        // intentionally simple avoids blocking the high-priority frame reader.
-        nil
     }
 '''
 
@@ -60,7 +48,7 @@ new_reader = '''    nonisolated private func readFrames(socket: BlockingSocket) 
         } catch {
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                guard self.videoSocket === socket else { return }
+                guard self.videoSocket === socket, self.connected else { return }
                 self.handleDisconnect(error)
             }
         }
