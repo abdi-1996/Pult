@@ -1,0 +1,37 @@
+name: Build TouchDisplay Windows Client v3
+
+on:
+  push:
+    branches: [touchdisplay-windows-client-v3]
+    paths:
+      - 'TouchDisplayWindowsClient/**'
+      - '.github/workflows/build-touchdisplay-windows-client-v3.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Windows Client EXE
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build single EXE
+        shell: pwsh
+        run: |
+          dotnet restore TouchDisplayWindowsClient/TouchDisplayWindowsClient.csproj
+          dotnet publish TouchDisplayWindowsClient/TouchDisplayWindowsClient.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o TouchDisplayWindowsClient/out
+          Copy-Item TouchDisplayWindowsClient/out/TouchDisplay-Windows-Client.exe TouchDisplay-Windows-Client-v3.exe
+          Get-Item TouchDisplay-Windows-Client-v3.exe | Format-List Name,Length
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: TouchDisplay-Windows-Client-v3
+          path: TouchDisplay-Windows-Client-v3.exe
+          if-no-files-found: error
+          retention-days: 30
