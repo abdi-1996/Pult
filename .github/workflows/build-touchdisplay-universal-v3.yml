@@ -1,4 +1,4 @@
-name: Build TouchDisplay v4 Low Latency
+name: Build TouchDisplay v4.1 Turbo
 
 on:
   push:
@@ -48,7 +48,7 @@ jobs:
           retention-days: 30
 
   ios:
-    name: iPhone + iPad Low Latency IPA v4.0
+    name: iPhone + iPad Turbo IPA v4.1
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -63,6 +63,7 @@ jobs:
           python3 TouchDisplayiOS/fix-v3.4.py
           python3 TouchDisplayiOS/fix-v3.5.py
           python3 TouchDisplayiOS/fix-v4.py
+          python3 TouchDisplayiOS/fix-v4.1.py
       - name: Generate Xcode project
         working-directory: TouchDisplayiOS
         run: xcodegen generate
@@ -85,18 +86,18 @@ jobs:
           rm -rf Payload
           mkdir Payload
           cp -R build/Build/Products/Release-iphoneos/TouchDisplay.app Payload/
-          zip -qry TouchDisplay-iPhone-iPad-v4.0.ipa Payload
-          ls -lh TouchDisplay-iPhone-iPad-v4.0.ipa
+          zip -qry TouchDisplay-iPhone-iPad-v4.1.ipa Payload
+          ls -lh TouchDisplay-iPhone-iPad-v4.1.ipa
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: TouchDisplay-iPhone-iPad-v4.0
-          path: TouchDisplayiOS/TouchDisplay-iPhone-iPad-v4.0.ipa
+          name: TouchDisplay-iPhone-iPad-v4.1
+          path: TouchDisplayiOS/TouchDisplay-iPhone-iPad-v4.1.ipa
           if-no-files-found: error
           retention-days: 30
 
   windows:
-    name: Universal Windows Host v4.0 Low Latency
+    name: Universal Windows Host v4.1 Turbo
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -104,20 +105,20 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Apply v4 host patches
+      - name: Apply v4.1 host patches
         shell: pwsh
-        run: ./TouchDisplayHost/patch-v4.ps1
+        run: ./TouchDisplayHost/patch-v4.1.ps1
       - name: Build one self-contained EXE
         shell: pwsh
         run: |
           dotnet restore TouchDisplayHost/TouchDisplayHost.csproj
           dotnet publish TouchDisplayHost/TouchDisplayHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o TouchDisplayHost/out
-          Copy-Item TouchDisplayHost/out/TouchDisplayHost.exe TouchDisplayHost-v4.0.exe
-          Get-Item TouchDisplayHost-v4.0.exe | Format-List Name,Length
+          Copy-Item TouchDisplayHost/out/TouchDisplayHost.exe TouchDisplayHost-v4.1.exe
+          Get-Item TouchDisplayHost-v4.1.exe | Format-List Name,Length
       - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
-          name: TouchDisplay-Windows-Host-v4.0
-          path: TouchDisplayHost-v4.0.exe
+          name: TouchDisplay-Windows-Host-v4.1
+          path: TouchDisplayHost-v4.1.exe
           if-no-files-found: error
           retention-days: 30
