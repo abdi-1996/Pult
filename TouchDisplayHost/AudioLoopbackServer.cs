@@ -45,7 +45,7 @@ internal sealed class AudioLoopbackServer
             {
                 var client = await _listener!.AcceptTcpClientAsync(token);
                 client.NoDelay = true;
-                client.SendBufferSize = 256 * 1024;
+                client.SendBufferSize = 128 * 1024;
                 _ = HandleClientAsync(client, token);
             }
             catch (OperationCanceledException) { break; }
@@ -79,7 +79,6 @@ internal sealed class AudioLoopbackServer
                 await stream.FlushAsync(serverToken);
                 if (!ok) return;
 
-                // v2 audio transport is fixed to 48 kHz / stereo / signed PCM16.
                 await WriteInt32BigEndianAsync(stream, 48000, serverToken);
                 await stream.WriteAsync(new byte[] { 2, 16 }, serverToken);
                 await stream.FlushAsync(serverToken);
@@ -89,7 +88,7 @@ internal sealed class AudioLoopbackServer
                 {
                     DiscardOnBufferOverflow = true,
                     ReadFully = false,
-                    BufferDuration = TimeSpan.FromMilliseconds(500)
+                    BufferDuration = TimeSpan.FromMilliseconds(120)
                 };
                 capture.DataAvailable += (_, e) =>
                 {
@@ -98,25 +97,28 @@ internal sealed class AudioLoopbackServer
 
                 using var resampler = new MediaFoundationResampler(buffered, new WaveFormat(48000, 16, 2))
                 {
-                    ResamplerQuality = 50
+                    // Lower resampler work/latency than the previous quality-50 path;
+                    // still more than enough for remote desktop audio.
+                    ResamplerQuality = 30
                 };
 
                 capture.StartRecording();
-                _status("Audio: подключено • 48 kHz stereo", false);
+                _status("Audio v4.1: подключено • 48 kHz stereo • 10 ms packets", false);
 
-                var pcm = new byte[3840]; // 20 ms at 48 kHz stereo PCM16
+                var pcm = new byte[1920]; // 10 ms at 48 kHz stereo PCM16
                 while (!serverToken.IsCancellationRequested && client.Connected)
                 {
                     var read = resampler.Read(pcm, 0, pcm.Length);
                     if (read <= 0)
                     {
-                        await Task.Delay(4, serverToken);
+                        await Task.Delay(2, serverToken);
                         continue;
                     }
 
                     await WriteInt32BigEndianAsync(stream, read, serverToken);
                     await stream.WriteAsync(pcm.AsMemory(0, read), serverToken);
-                    await stream.FlushAsync(serverToken);
+                    // NetworkStream itself is unbuffered; no FlushAsync here avoids
+                    // an unnecessary await on every 10 ms audio packet.
                 }
 
                 try { capture.StopRecording(); } catch { }
