@@ -1,5 +1,12 @@
 from pathlib import Path
 
+# Swift tuple key-path support differs across compiler versions; keep this simple
+# for GitHub's Xcode runner.
+receiver_path = Path('TouchDisplayiOS/Sources/UdpVideoReceiver.swift')
+receiver_text = receiver_path.read_text(encoding='utf-8')
+receiver_text = receiver_text.replace('}.map(\\.key)', '}.map { $0.key }')
+receiver_path.write_text(receiver_text, encoding='utf-8')
+
 network_path = Path('TouchDisplayiOS/Sources/NetworkClient.swift')
 text = network_path.read_text(encoding='utf-8')
 
@@ -35,7 +42,6 @@ if old_stats not in text:
     raise SystemExit('v4.1 stats callback target not found')
 text = text.replace(old_stats, new_stats, 1)
 
-# Reset diagnostics whenever a session ends.
 text = text.replace('''        frame = nil
         status = "Соединение потеряно: \\(error.localizedDescription)"
 ''', '''        frame = nil
