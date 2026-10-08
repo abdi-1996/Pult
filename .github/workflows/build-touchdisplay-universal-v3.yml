@@ -63,7 +63,8 @@ jobs:
           python3 TouchDisplayiOS/fix-v3.4.py
           python3 TouchDisplayiOS/fix-v3.5.py
           python3 TouchDisplayiOS/fix-v4.py
-          python3 TouchDisplayiOS/fix-v4.1.py\n          python3 TouchDisplayiOS/fix-v4.2.py
+          python3 TouchDisplayiOS/fix-v4.1.py
+          python3 TouchDisplayiOS/fix-v4.2.py
       - name: Generate Xcode project
         working-directory: TouchDisplayiOS
         run: xcodegen generate
