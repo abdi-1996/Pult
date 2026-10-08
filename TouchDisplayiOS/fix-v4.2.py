@@ -181,8 +181,7 @@ final class RemoteDisplayUIView: UIView, UIGestureRecognizerDelegate {
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleSensorLongPress(_:)))
         longPress.minimumPressDuration = 0.55
         longPress.allowableMovement = 18
-        longPress.minimumNumberOfTouches = 1
-        longPress.maximumNumberOfTouches = 1
+        longPress.numberOfTouchesRequired = 1
         longPress.cancelsTouchesInView = false
         longPress.delegate = self
         addGestureRecognizer(longPress)
@@ -190,8 +189,7 @@ final class RemoteDisplayUIView: UIView, UIGestureRecognizerDelegate {
         let exitGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleThreeFingerExit(_:)))
         exitGesture.minimumPressDuration = 1.0
         exitGesture.allowableMovement = 28
-        exitGesture.minimumNumberOfTouches = 3
-        exitGesture.maximumNumberOfTouches = 3
+        exitGesture.numberOfTouchesRequired = 3
         exitGesture.cancelsTouchesInView = true
         exitGesture.delegate = self
         addGestureRecognizer(exitGesture)
