@@ -157,6 +157,17 @@ internal sealed class AdaptiveDisplaySession : IDisposable
         mode.dmDisplayOrientation is DisplayModeNative.DMDO_90 or DisplayModeNative.DMDO_270 ||
         mode.dmPelsHeight > mode.dmPelsWidth;
 
+    public void Restore()
+    {
+        lock (_sync)
+        {
+            if (_disposed) return;
+            RestoreCore();
+            _lastClientWidth = 0;
+            _lastClientHeight = 0;
+        }
+    }
+
     private void RestoreCore()
     {
         if (!_changedByUs || !_hasOriginal || string.IsNullOrWhiteSpace(_deviceName)) return;
