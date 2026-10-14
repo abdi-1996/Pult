@@ -1,0 +1,43 @@
+name: Build TouchDisplay Long Press v1.2.11
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [touchdisplay-mobile-web-v1]
+    paths:
+      - 'TouchDisplayMobileWeb/**'
+      - 'TouchDisplayPatchUpdater/**'
+      - '.github/workflows/build-touchdisplay-patch-v1.2.11.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish updated TouchDisplay core
+        shell: pwsh
+        run: |
+          dotnet restore TouchDisplayMobileWeb/TouchDisplayMobileWeb.csproj
+          dotnet publish TouchDisplayMobileWeb/TouchDisplayMobileWeb.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o appout
+          New-Item -ItemType Directory -Force -Path TouchDisplayPatchUpdater/payload | Out-Null
+          Copy-Item appout/TouchDisplayMobileWeb.dll TouchDisplayPatchUpdater/payload/TouchDisplayMobileWeb.dll
+          if (!(Test-Path TouchDisplayPatchUpdater/payload/TouchDisplayMobileWeb.dll)) { throw "Core DLL missing" }
+
+      - name: Build in-place updater
+        shell: pwsh
+        run: |
+          dotnet restore TouchDisplayPatchUpdater/TouchDisplayPatchUpdater.csproj
+          dotnet publish TouchDisplayPatchUpdater/TouchDisplayPatchUpdater.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o out
+          Copy-Item out/TouchDisplay-Update-v1.2.11.exe TouchDisplay-Update-v1.2.11.exe
+          Get-Item TouchDisplay-Update-v1.2.11.exe | Format-List Name,Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TouchDisplay-Update-v1.2.11
+          path: TouchDisplay-Update-v1.2.11.exe
+          retention-days: 30
