@@ -26,28 +26,28 @@ internal static class Program
                 MessageBox.Show(
                     "В выбранной папке не найдена версия TouchDisplay с отдельными файлами.\n\n" +
                     "Сначала должна быть установлена версия v1.2.",
-                    "TouchDisplay Update v1.2.11",
+                    "TouchDisplay Update v1.2.12",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
                 return;
             }
 
             if (MessageBox.Show(
-                "Добавить правую кнопку мыши по долгому нажатию?\n\n" +
+                "Включить автоматический запуск TouchDisplay вместе с Windows?\n\n" +
                 "Будут обновлены файлы Adaptive Display и интерфейса:\n" +
                 "• TouchDisplayMobileWeb.dll\n" +
                 "• wwwroot\\app.js\n" +
                 "• wwwroot\\app.css\n" +
                 "• wwwroot\\index.html\n\n" +
                 "PIN, настройки и остальные файлы приложения не меняются.",
-                "TouchDisplay Update v1.2.11",
+                "TouchDisplay Update v1.2.12",
                 MessageBoxButtons.OKCancel,
                 MessageBoxIcon.Information) != DialogResult.OK)
                 return;
 
             StopApp(target);
 
-            var backup = Path.Combine(target, "Backup", "ui-v1.2.11-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+            var backup = Path.Combine(target, "Backup", "ui-v1.2.12-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
             Directory.CreateDirectory(backup);
 
             PatchRootFile(target, backup, "TouchDisplayMobileWeb.dll", "TouchDisplayPatch.TouchDisplayMobileWeb.dll");
@@ -57,7 +57,9 @@ internal static class Program
 
             var data = Path.Combine(target, "data");
             Directory.CreateDirectory(data);
-            File.WriteAllText(Path.Combine(data, "version.txt"), "1.2.11");
+            File.WriteAllText(Path.Combine(data, "version.txt"), "1.2.12");
+
+            EnableAutoStart(target);
 
             var exe = Path.Combine(target, AppExe);
             var p = Process.Start(new ProcessStartInfo
@@ -76,9 +78,9 @@ internal static class Program
 
             MessageBox.Show(
                 "Готово.\n\n" +
-                "На рабочем столе короткое касание остаётся обычным кликом, а удержание пальца примерно 0,56 секунды вызывает настоящую правую кнопку мыши Windows. Небольшое движение пальца отменяет долгое нажатие, чтобы оно не мешало перемещению курсора.\n\n" +
+                "TouchDisplay теперь автоматически запускается после входа в Windows и сразу работает в фоне в системном трее. Окно программы при автозапуске не мешает работе. Двойной клик по значку в трее открывает TouchDisplay.\n\n" +
                 "На iPhone полностью закрой старую вкладку/PWA TouchDisplay и открой снова.",
-                "TouchDisplay v1.2.11",
+                "TouchDisplay v1.2.12",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         }
@@ -86,7 +88,7 @@ internal static class Program
         {
             MessageBox.Show(
                 "Не удалось установить обновление.\n\n" + ex.Message,
-                "TouchDisplay Update v1.2.11",
+                "TouchDisplay Update v1.2.12",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
@@ -98,7 +100,7 @@ internal static class Program
 
         using var form = new Form
         {
-            Text = "TouchDisplay Update v1.2.11",
+            Text = "TouchDisplay Update v1.2.12",
             ClientSize = new Size(660, 210),
             FormBorderStyle = FormBorderStyle.FixedDialog,
             MaximizeBox = false,
@@ -235,6 +237,15 @@ internal static class Program
             return here;
 
         return null;
+    }
+
+    private static void EnableAutoStart(string target)
+    {
+        using var key = Registry.CurrentUser.CreateSubKey(RunKey, true)
+            ?? throw new InvalidOperationException("Не удалось включить автозапуск Windows.");
+
+        var exe = Path.Combine(target, AppExe);
+        key.SetValue(RunValue, "\"" + exe + "\" --autostart");
     }
 
     private static void StopApp(string target)
