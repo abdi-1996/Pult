@@ -17,7 +17,7 @@ internal static class Program
 
         try
         {
-            var target = FindTargetFolder();
+            var target = ChooseTargetFolder();
             if (target is null) return;
 
             var web = Path.Combine(target, "wwwroot");
@@ -26,7 +26,7 @@ internal static class Program
                 MessageBox.Show(
                     "В выбранной папке не найдена версия TouchDisplay с отдельными файлами.\n\n" +
                     "Сначала должна быть установлена версия v1.2.",
-                    "TouchDisplay Update v1.2.1",
+                    "TouchDisplay Update v1.2.2",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
                 return;
@@ -39,14 +39,14 @@ internal static class Program
                 "• wwwroot\\app.css\n" +
                 "• wwwroot\\index.html\n\n" +
                 "Остальные файлы приложения и настройки не меняются.",
-                "TouchDisplay Update v1.2.1",
+                "TouchDisplay Update v1.2.2",
                 MessageBoxButtons.OKCancel,
                 MessageBoxIcon.Information) != DialogResult.OK)
                 return;
 
             StopApp(target);
 
-            var backup = Path.Combine(target, "Backup", "ui-v1.2.1-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+            var backup = Path.Combine(target, "Backup", "ui-v1.2.2-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
             Directory.CreateDirectory(backup);
 
             PatchFile(web, backup, "app.js", "TouchDisplayPatch.app.js");
@@ -75,7 +75,7 @@ internal static class Program
             MessageBox.Show(
                 "Готово. Исправлены вкладки и кнопки.\n\n" +
                 "На iPhone полностью закрой старую вкладку/PWA TouchDisplay и открой снова.",
-                "TouchDisplay v1.2.1",
+                "TouchDisplay v1.2.2",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         }
@@ -83,13 +83,133 @@ internal static class Program
         {
             MessageBox.Show(
                 "Не удалось установить обновление.\n\n" + ex.Message,
-                "TouchDisplay Update v1.2.1",
+                "TouchDisplay Update v1.2.2",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
     }
 
-    private static string? FindTargetFolder()
+    private static string? ChooseTargetFolder()
+    {
+        var suggested = DetectInstalledFolder();
+
+        using var form = new Form
+        {
+            Text = "TouchDisplay Update v1.2.2",
+            ClientSize = new Size(660, 210),
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            StartPosition = FormStartPosition.CenterScreen,
+            BackColor = Color.FromArgb(18, 23, 31),
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 10f)
+        };
+
+        var title = new Label
+        {
+            Text = "Выберите папку установленного TouchDisplay",
+            AutoSize = false,
+            Location = new Point(24, 20),
+            Size = new Size(610, 30),
+            Font = new Font("Segoe UI", 13f, FontStyle.Bold),
+            ForeColor = Color.White
+        };
+
+        var hint = new Label
+        {
+            Text = "Можно выбрать другое местоположение вручную. Обновление затронет только файлы интерфейса.",
+            AutoSize = false,
+            Location = new Point(24, 53),
+            Size = new Size(610, 42),
+            ForeColor = Color.FromArgb(175, 185, 198)
+        };
+
+        var pathBox = new TextBox
+        {
+            Location = new Point(24, 103),
+            Size = new Size(500, 32),
+            Text = suggested ?? AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar)
+        };
+
+        var browse = new Button
+        {
+            Text = "Обзор...",
+            Location = new Point(536, 101),
+            Size = new Size(100, 36)
+        };
+
+        var cancel = new Button
+        {
+            Text = "Отмена",
+            DialogResult = DialogResult.Cancel,
+            Location = new Point(430, 157),
+            Size = new Size(95, 36)
+        };
+
+        var update = new Button
+        {
+            Text = "Обновить",
+            DialogResult = DialogResult.OK,
+            Location = new Point(536, 157),
+            Size = new Size(100, 36)
+        };
+
+        browse.Click += (_, _) =>
+        {
+            using var picker = new FolderBrowserDialog
+            {
+                Description = "Выберите папку, где установлен TouchDisplay",
+                UseDescriptionForTitle = true,
+                ShowNewFolderButton = false,
+                SelectedPath = Directory.Exists(pathBox.Text) ? pathBox.Text : (suggested ?? string.Empty)
+            };
+            if (picker.ShowDialog(form) == DialogResult.OK)
+                pathBox.Text = picker.SelectedPath;
+        };
+
+        form.Controls.AddRange(new Control[] { title, hint, pathBox, browse, cancel, update });
+        form.AcceptButton = update;
+        form.CancelButton = cancel;
+
+        while (true)
+        {
+            if (form.ShowDialog() != DialogResult.OK)
+                return null;
+
+            var selected = pathBox.Text.Trim().Trim('"');
+            if (string.IsNullOrWhiteSpace(selected))
+            {
+                MessageBox.Show(form, "Укажите папку TouchDisplay.", "TouchDisplay Update", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                continue;
+            }
+
+            try { selected = Path.GetFullPath(selected); }
+            catch
+            {
+                MessageBox.Show(form, "Неверный путь к папке.", "TouchDisplay Update", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                continue;
+            }
+
+            if (!File.Exists(Path.Combine(selected, AppExe)) || !Directory.Exists(Path.Combine(selected, "wwwroot")))
+            {
+                MessageBox.Show(
+                    form,
+                    "В этой папке не найден TouchDisplay v1.2 с отдельными файлами.\n\n" +
+                    "Нужны:\n" +
+                    "• TouchDisplayMobileWeb.exe\n" +
+                    "• папка wwwroot",
+                    "TouchDisplay не найден",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                continue;
+            }
+
+            return selected;
+        }
+    }
+
+    private static string? DetectInstalledFolder()
     {
         try
         {
@@ -111,13 +231,7 @@ internal static class Program
         if (File.Exists(Path.Combine(here, AppExe)) && Directory.Exists(Path.Combine(here, "wwwroot")))
             return here;
 
-        using var picker = new FolderBrowserDialog
-        {
-            Description = "Выберите папку TouchDisplay v1.2",
-            UseDescriptionForTitle = true,
-            ShowNewFolderButton = false
-        };
-        return picker.ShowDialog() == DialogResult.OK ? picker.SelectedPath : null;
+        return null;
     }
 
     private static void StopApp(string target)
