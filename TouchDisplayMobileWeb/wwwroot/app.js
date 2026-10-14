@@ -243,7 +243,7 @@
     let vo=false,co=false;
     const ready=()=>{if(vo&&co)$('#desktopConnecting').style.display='none'};
     v.onopen=()=>{vo=true;ready()};
-    c.onopen=()=>{co=true;ready()};
+    c.onopen=()=>{co=true;sendDisplayProfile();ready()};
     v.onmessage=e=>queueFrame(e.data);
     const closed=()=>{ if ($('#pageDesktop').classList.contains('active')) { $('#desktopConnecting').textContent='Переподключение…'; $('#desktopConnecting').style.display='grid'; setTimeout(()=>{stopDesktop();startDesktop()},900); } };
     v.onclose=closed; c.onclose=closed; v.onerror=()=>{}; c.onerror=()=>{};
@@ -255,6 +255,25 @@
     try{state.control?.close()}catch{}
     state.video=null; state.control=null; state.pointers.clear();
   }
+
+  function sendDisplayProfile() {
+    if (!state.control || state.control.readyState !== 1) return;
+    const vv = window.visualViewport;
+    const w = Math.max(1, Math.round(vv?.width || window.innerWidth || screen.width || 1));
+    const h = Math.max(1, Math.round(vv?.height || window.innerHeight || screen.height || 1));
+    const dpr = Math.max(1, Math.min(4, window.devicePixelRatio || 1));
+    send({t:'profile',w,h,dpr});
+  }
+
+  let profileTimer = null;
+  function scheduleDisplayProfile() {
+    clearTimeout(profileTimer);
+    profileTimer = setTimeout(() => {
+      if ($('#pageDesktop').classList.contains('active')) sendDisplayProfile();
+    }, 450);
+  }
+  window.addEventListener('orientationchange', scheduleDisplayProfile);
+  window.addEventListener('resize', scheduleDisplayProfile);
 
   async function queueFrame(buffer) {
     state.pendingFrame = buffer;
