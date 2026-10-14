@@ -305,14 +305,31 @@
   }
 
   function drawBitmap(bmp) {
-    const canvas=$('#desktopCanvas'), box=$('#desktopStage').getBoundingClientRect(), dpr=Math.min(2,devicePixelRatio||1);
-    const w=Math.max(1,Math.round(box.width*dpr)), h=Math.max(1,Math.round(box.height*dpr));
+    const canvas=$('#desktopCanvas');
+    const stage=$('#desktopStage');
+    const box=stage.getBoundingClientRect();
+    const cssScale=Math.min(box.width/bmp.width,box.height/bmp.height);
+    const cssW=Math.max(1,bmp.width*cssScale);
+    const cssH=Math.max(1,bmp.height*cssScale);
+    const cssX=(box.width-cssW)/2;
+    const cssY=(box.height-cssH)/2;
+
+    // The canvas and hit area themselves are centered, not only the pixels drawn
+    // inside a full-screen canvas. This guarantees equal black bars on both sides.
+    stage.style.setProperty('--desktop-frame-left',cssX+'px');
+    stage.style.setProperty('--desktop-frame-top',cssY+'px');
+    stage.style.setProperty('--desktop-frame-width',cssW+'px');
+    stage.style.setProperty('--desktop-frame-height',cssH+'px');
+
+    const dpr=Math.min(2,devicePixelRatio||1);
+    const w=Math.max(1,Math.round(cssW*dpr));
+    const h=Math.max(1,Math.round(cssH*dpr));
     if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
+
     const ctx=canvas.getContext('2d',{alpha:false});
-    ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);
-    const s=Math.min(w/bmp.width,h/bmp.height);
-    const dw=bmp.width*s,dh=bmp.height*s,x=(w-dw)/2,y=(h-dh)/2;
-    ctx.drawImage(bmp,x,y,dw,dh);
+    ctx.fillStyle='#000';
+    ctx.fillRect(0,0,w,h);
+    ctx.drawImage(bmp,0,0,w,h);
   }
 
   function send(o) {
@@ -346,10 +363,11 @@
   hit.addEventListener('pointercancel',e=>pointerEnd(e,true));
 
   function normalPoint(x,y){
-    const r=hit.getBoundingClientRect(),iw=state.frameSize.w,ih=state.frameSize.h;
-    const s=Math.min(r.width/iw,r.height/ih);
-    const dw=iw*s,dh=ih*s,l=(r.width-dw)/2,t=(r.height-dh)/2;
-    return{x:Math.max(0,Math.min(1,(x-r.left-l)/Math.max(1,dw))),y:Math.max(0,Math.min(1,(y-r.top-t)/Math.max(1,dh)))};
+    const r=hit.getBoundingClientRect();
+    return{
+      x:Math.max(0,Math.min(1,(x-r.left)/Math.max(1,r.width))),
+      y:Math.max(0,Math.min(1,(y-r.top)/Math.max(1,r.height)))
+    };
   }
 
   const modeBtn=$('#modeBtn');
