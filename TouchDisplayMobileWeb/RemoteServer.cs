@@ -194,7 +194,7 @@ internal sealed class RemoteServer
             gpu = new { percent = Math.Round(s.GpuPercent), memory = Math.Round(s.GpuMemoryPercent), name = s.GpuName },
             ram = new { percent = Math.Round(s.RamPercent), used = Math.Round(s.RamUsedGb, 1), total = Math.Round(s.RamTotalGb, 1) },
             network = new { down = Math.Round(s.DownMbps, 1), up = Math.Round(s.UpMbps, 1) },
-            version = "1.2.10"
+            version = "1.2.11"
         }, token);
     }
 
@@ -502,6 +502,12 @@ internal sealed class RemoteServer
                         MouseController.Button(
                             root.TryGetProperty("b", out var b) ? b.GetInt32() : 0,
                             root.TryGetProperty("a", out var a) ? a.GetInt32() : 2);
+                        break;
+                    case "rightclick":
+                        MouseController.RightClickAt(
+                            root.GetProperty("x").GetSingle(),
+                            root.GetProperty("y").GetSingle(),
+                            bounds);
                         break;
                     case "wheel":
                         MouseController.WheelDelta(root.GetProperty("d").GetInt32());
