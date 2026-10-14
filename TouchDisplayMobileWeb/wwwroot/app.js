@@ -310,7 +310,7 @@
     if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
     const ctx=canvas.getContext('2d',{alpha:false});
     ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);
-    const s=Math.max(w/bmp.width,h/bmp.height);
+    const s=Math.min(w/bmp.width,h/bmp.height);
     const dw=bmp.width*s,dh=bmp.height*s,x=(w-dw)/2,y=(h-dh)/2;
     ctx.drawImage(bmp,x,y,dw,dh);
   }
@@ -347,7 +347,7 @@
 
   function normalPoint(x,y){
     const r=hit.getBoundingClientRect(),iw=state.frameSize.w,ih=state.frameSize.h;
-    const s=Math.max(r.width/iw,r.height/ih);
+    const s=Math.min(r.width/iw,r.height/ih);
     const dw=iw*s,dh=ih*s,l=(r.width-dw)/2,t=(r.height-dh)/2;
     return{x:Math.max(0,Math.min(1,(x-r.left-l)/Math.max(1,dw))),y:Math.max(0,Math.min(1,(y-r.top-t)/Math.max(1,dh)))};
   }
