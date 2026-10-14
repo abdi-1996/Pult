@@ -104,7 +104,7 @@
         <div class="sys-row"><span>LAN</span><b id="sysLan">—</b></div>
         <div class="sys-row"><span>Tailscale</span><b id="sysTail">—</b></div>
         <div class="sys-row"><span>Разрешение</span><b id="sysResolution">—</b></div>
-        <div class="sys-row"><span>Версия</span><b id="sysVersion">1.0</b></div>
+        <div class="sys-row"><span>Версия</span><b id="sysVersion">1.1</b></div>
       </section>
       <section class="panel help-card">
         <h3>Доступ вне дома</h3>
@@ -113,21 +113,36 @@
     </main>
 
     <main id="pageDesktop" class="page desktop-page">
-      <div class="desktop-head">
-        <button class="back-btn" data-go="home">‹</button>
-        <div class="grow"><h2>Рабочий стол</h2><small id="desktopInfo">Подключение…</small></div>
-        <span id="desktopLatency" class="latency">—</span>
-      </div>
       <div id="desktopStage" class="desktop-stage">
         <canvas id="desktopCanvas"></canvas>
         <div id="desktopHit" class="desktop-hit"></div>
         <div id="desktopConnecting" class="desktop-connecting">Подключение к экрану…</div>
-      </div>
-      <div class="desktop-controls panel">
-        <button id="modeBtn" class="control active">🖱<span>Мышь</span></button>
-        <button id="lmbBtn" class="control">◐<span>ЛКМ</span></button>
-        <button id="rmbBtn" class="control">◑<span>ПКМ</span></button>
-        <button id="keyboardBtn" class="control">⌨<span>Клавиатура</span></button>
+
+        <div class="desktop-overlay-top">
+          <div class="desktop-top-group">
+            <button class="desktop-float-btn" data-go="home" aria-label="Назад">‹</button>
+            <button class="desktop-float-btn desktop-float-wide" id="desktopInfo">Рабочий стол</button>
+          </div>
+          <div class="desktop-right-group">
+            <span id="desktopLatency" class="desktop-latency">—</span>
+            <button class="desktop-float-btn" id="desktopMenuBtn" aria-label="Меню">⋯</button>
+          </div>
+        </div>
+
+        <div id="desktopQuickMenu" class="desktop-quick-menu hidden">
+          <button data-go="home">Главная</button>
+          <button data-go="files">Файлы</button>
+          <button data-go="system">Система</button>
+        </div>
+
+        <div class="desktop-controls-wrap">
+          <div class="desktop-controls">
+            <button id="modeBtn" class="control active">🖱<span>Мышь</span></button>
+            <button id="lmbBtn" class="control">◐<span>ЛКМ</span></button>
+            <button id="rmbBtn" class="control">◑<span>ПКМ</span></button>
+            <button id="keyboardBtn" class="control">⌨<span>Клавиатура</span></button>
+          </div>
+        </div>
       </div>
       <input id="keyboardSink" class="keyboard-sink" autocapitalize="off" autocomplete="off" spellcheck="false">
     </main>
