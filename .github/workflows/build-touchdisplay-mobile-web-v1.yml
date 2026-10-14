@@ -1,4 +1,4 @@
-name: Build TouchDisplay Mobile Web v1.1 Fullscreen
+name: Build TouchDisplay Mobile Web v1.1.1 Navigation Fix
 
 on:
   push:
@@ -23,12 +23,12 @@ jobs:
         run: |
           dotnet restore TouchDisplayMobileWeb/TouchDisplayMobileWeb.csproj
           dotnet publish TouchDisplayMobileWeb/TouchDisplayMobileWeb.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o TouchDisplayMobileWeb/out
-          Copy-Item TouchDisplayMobileWeb/out/TouchDisplayMobileWeb.exe TouchDisplay-Mobile-Web-v1.1.exe
-          Get-Item TouchDisplay-Mobile-Web-v1.1.exe | Format-List Name,Length
+          Copy-Item TouchDisplayMobileWeb/out/TouchDisplayMobileWeb.exe TouchDisplay-Mobile-Web-v1.1.1.exe
+          Get-Item TouchDisplay-Mobile-Web-v1.1.1.exe | Format-List Name,Length
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: TouchDisplay-Mobile-Web-v1.1
-          path: TouchDisplay-Mobile-Web-v1.1.exe
+          path: TouchDisplay-Mobile-Web-v1.1.1.exe
           if-no-files-found: error
           retention-days: 30
