@@ -194,7 +194,7 @@ internal sealed class RemoteServer
             gpu = new { percent = Math.Round(s.GpuPercent), memory = Math.Round(s.GpuMemoryPercent), name = s.GpuName },
             ram = new { percent = Math.Round(s.RamPercent), used = Math.Round(s.RamUsedGb, 1), total = Math.Round(s.RamTotalGb, 1) },
             network = new { down = Math.Round(s.DownMbps, 1), up = Math.Round(s.UpMbps, 1) },
-            version = "1.2.11"
+            version = "1.2.12"
         }, token);
     }
 
