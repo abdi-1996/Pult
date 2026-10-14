@@ -7,12 +7,13 @@
     <Nullable>enable</Nullable>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
-    <AssemblyName>TouchDisplay-Update-v1.2.4</AssemblyName>
+    <AssemblyName>TouchDisplay-Update-v1.2.5</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="..\TouchDisplayMobileWeb\wwwroot\app.js" Link="Payload\app.js" LogicalName="TouchDisplayPatch.app.js" />
     <EmbeddedResource Include="..\TouchDisplayMobileWeb\wwwroot\app.css" Link="Payload\app.css" LogicalName="TouchDisplayPatch.app.css" />
     <EmbeddedResource Include="..\TouchDisplayMobileWeb\wwwroot\index.html" Link="Payload\index.html" LogicalName="TouchDisplayPatch.index.html" />
+    <EmbeddedResource Include="payload\TouchDisplayMobileWeb.dll" LogicalName="TouchDisplayPatch.TouchDisplayMobileWeb.dll" Condition="Exists('payload\TouchDisplayMobileWeb.dll')" />
   </ItemGroup>
 </Project>
