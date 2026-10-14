@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <AssemblyName>TouchDisplay-Update-v1.2.1</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\TouchDisplayMobileWeb\wwwroot\app.js" Link="Payload\app.js" LogicalName="TouchDisplayPatch.app.js" />
+    <EmbeddedResource Include="..\TouchDisplayMobileWeb\wwwroot\app.css" Link="Payload\app.css" LogicalName="TouchDisplayPatch.app.css" />
+    <EmbeddedResource Include="..\TouchDisplayMobileWeb\wwwroot\index.html" Link="Payload\index.html" LogicalName="TouchDisplayPatch.index.html" />
+  </ItemGroup>
+</Project>
