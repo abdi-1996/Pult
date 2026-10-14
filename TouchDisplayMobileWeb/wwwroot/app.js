@@ -15,7 +15,8 @@
     pendingFrame: null,
     decoding: false,
     statsTimer: null,
-    latency: null
+    latency: null,
+    desktopFill: false
   };
 
   const login = $('#login'), app = $('#app'), pinInput = $('#pin'), loginError = $('#loginError');
@@ -85,7 +86,8 @@
     $('#sysTail').textContent = s.tailscale || '—';
     $('#sysResolution').textContent = s.width + ' × ' + s.height;
     $('#sysVersion').textContent = s.version;
-    $('#desktopInfo').textContent = s.pc + ' • ' + s.width + ' × ' + s.height;
+    const desktopInfo = $('#desktopInfo');
+    if (desktopInfo) desktopInfo.textContent = s.pc + ' • ' + s.width + ' × ' + s.height;
   }
 
   function startStatusLoop() {
@@ -99,7 +101,10 @@
         applyStatus(s);
         $('#connectionBadge').textContent = 'Online';
         $('#connectionBadge').className = 'badge online-badge';
-        if ($('#pageDesktop').classList.contains('active')) $('#desktopLatency').textContent = state.latency + ' мс';
+        if ($('#pageDesktop').classList.contains('active')) {
+          const latencyEl = $('#desktopLatency');
+          if (latencyEl) latencyEl.textContent = state.latency + ' мс';
+        }
       } catch {
         $('#connectionBadge').textContent = 'Offline';
         $('#connectionBadge').className = 'badge';
@@ -121,7 +126,8 @@
     if (name === 'files') loadFiles(state.currentPath || '');
     if (name === 'gallery') loadRecent();
     if (desktopMode) {
-      $('#desktopQuickMenu')?.classList.add('hidden');
+      state.desktopFill = false;
+      updateDesktopViewMode();
       startDesktop();
     } else {
       stopDesktop();
@@ -243,7 +249,7 @@
     let vo=false,co=false;
     const ready=()=>{if(vo&&co)$('#desktopConnecting').style.display='none'};
     v.onopen=()=>{vo=true;ready()};
-    c.onopen=()=>{co=true;sendDisplayProfile();ready()};
+    c.onopen=()=>{co=true;if(state.desktopFill)sendDisplayProfile();ready()};
     v.onmessage=e=>queueFrame(e.data);
     const closed=()=>{ if ($('#pageDesktop').classList.contains('active')) { $('#desktopConnecting').textContent='Переподключение…'; $('#desktopConnecting').style.display='grid'; setTimeout(()=>{stopDesktop();startDesktop()},900); } };
     v.onclose=closed; c.onclose=closed; v.onerror=()=>{}; c.onerror=()=>{};
@@ -257,7 +263,7 @@
   }
 
   function sendDisplayProfile() {
-    if (!state.control || state.control.readyState !== 1) return;
+    if (!state.desktopFill || !state.control || state.control.readyState !== 1) return;
     const vv = window.visualViewport;
     const w = Math.max(1, Math.round(vv?.width || window.innerWidth || screen.width || 1));
     const h = Math.max(1, Math.round(vv?.height || window.innerHeight || screen.height || 1));
@@ -265,11 +271,38 @@
     send({t:'profile',w,h,dpr});
   }
 
+  function resetDisplayProfile() {
+    if (state.control && state.control.readyState === 1) send({t:'profile-reset'});
+  }
+
+  function updateDesktopViewMode() {
+    const b = $('#desktopFullscreenBtn');
+    if (!b) return;
+    b.classList.toggle('active', state.desktopFill);
+    b.innerHTML = state.desktopFill ? '▣ <span>Обычный экран</span>' : '⛶ <span>Во весь экран</span>';
+    b.setAttribute('aria-label', state.desktopFill ? 'Обычный экран' : 'Во весь экран');
+  }
+
+  $('#desktopFullscreenBtn')?.addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    state.desktopFill = !state.desktopFill;
+    updateDesktopViewMode();
+    if (state.desktopFill) sendDisplayProfile();
+    else resetDisplayProfile();
+  });
+
+  $('#desktopExitBtn')?.addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    go('home');
+  });
+
   let profileTimer = null;
   function scheduleDisplayProfile() {
     clearTimeout(profileTimer);
     profileTimer = setTimeout(() => {
-      if ($('#pageDesktop').classList.contains('active')) sendDisplayProfile();
+      if (state.desktopFill && $('#pageDesktop').classList.contains('active')) sendDisplayProfile();
     }, 450);
   }
   window.addEventListener('orientationchange', scheduleDisplayProfile);
@@ -299,7 +332,8 @@
     if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
     const ctx=canvas.getContext('2d',{alpha:false});
     ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);
-    const s=Math.min(w/bmp.width,h/bmp.height),dw=bmp.width*s,dh=bmp.height*s,x=(w-dw)/2,y=(h-dh)/2;
+    const s=state.desktopFill ? Math.max(w/bmp.width,h/bmp.height) : Math.min(w/bmp.width,h/bmp.height);
+    const dw=bmp.width*s,dh=bmp.height*s,x=(w-dw)/2,y=(h-dh)/2;
     ctx.drawImage(bmp,x,y,dw,dh);
   }
 
@@ -344,7 +378,9 @@
   hit.addEventListener('pointercancel',e=>pointerEnd(e,true));
 
   function normalPoint(x,y){
-    const r=hit.getBoundingClientRect(),iw=state.frameSize.w,ih=state.frameSize.h,s=Math.min(r.width/iw,r.height/ih),dw=iw*s,dh=ih*s,l=(r.width-dw)/2,t=(r.height-dh)/2;
+    const r=hit.getBoundingClientRect(),iw=state.frameSize.w,ih=state.frameSize.h;
+    const s=state.desktopFill ? Math.max(r.width/iw,r.height/ih) : Math.min(r.width/iw,r.height/ih);
+    const dw=iw*s,dh=ih*s,l=(r.width-dw)/2,t=(r.height-dh)/2;
     return{x:Math.max(0,Math.min(1,(x-r.left-l)/Math.max(1,dw))),y:Math.max(0,Math.min(1,(y-r.top-t)/Math.max(1,dh)))};
   }
 
