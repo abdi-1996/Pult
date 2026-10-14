@@ -135,3 +135,34 @@ radial-gradient(circle at 100% 30%,#0b2744 0,transparent 28%),var(--bg)}
   z-index:100!important;
   background:rgba(0,0,0,.38)!important;
 }
+
+
+/* v1.2.9 — mathematically centered no-crop desktop frame */
+.app.desktop-mode #desktopStage{
+  position:fixed!important;
+  inset:0!important;
+  width:100vw!important;
+  height:100dvh!important;
+  padding:0!important;
+  margin:0!important;
+  background:#000!important;
+  overflow:hidden!important;
+  --desktop-frame-left:0px;
+  --desktop-frame-top:0px;
+  --desktop-frame-width:100vw;
+  --desktop-frame-height:100dvh;
+}
+.app.desktop-mode #desktopCanvas,
+.app.desktop-mode #desktopHit{
+  position:absolute!important;
+  inset:auto!important;
+  right:auto!important;
+  bottom:auto!important;
+  left:var(--desktop-frame-left)!important;
+  top:var(--desktop-frame-top)!important;
+  width:var(--desktop-frame-width)!important;
+  height:var(--desktop-frame-height)!important;
+  margin:0!important;
+  transform:none!important;
+}
+.app.desktop-mode #desktopCanvas{display:block!important;background:#000!important}
