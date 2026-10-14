@@ -292,13 +292,22 @@
   hit.addEventListener('contextmenu',e=>e.preventDefault());
   hit.addEventListener('pointerdown',e=>{
     try{hit.setPointerCapture(e.pointerId)}catch{}
-    state.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,at:performance.now(),moved:false});
-    if(!state.mouseMode){const p=normalPoint(e.clientX,e.clientY);send({t:'touch',a:'down',id:e.pointerId%32,x:p.x,y:p.y})}
+    const edgeBack = e.clientX <= 18;
+    state.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,at:performance.now(),moved:false,edgeBack,edgeDone:false});
+    if(!state.mouseMode && !edgeBack){const p=normalPoint(e.clientX,e.clientY);send({t:'touch',a:'down',id:e.pointerId%32,x:p.x,y:p.y})}
   });
   hit.addEventListener('pointermove',e=>{
     const p=state.pointers.get(e.pointerId);if(!p)return;
     const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
     if(Math.hypot(e.clientX-p.sx,e.clientY-p.sy)>5)p.moved=true;
+    if(p.edgeBack){
+      if(!p.edgeDone && e.clientX-p.sx>88 && Math.abs(e.clientY-p.sy)<100){
+        p.edgeDone=true;
+        state.pointers.clear();
+        go('home');
+      }
+      return;
+    }
     if(state.mouseMode){
       if(state.pointers.size>=2){const d=Math.round(-dy*7);if(d)send({t:'wheel',d})}
       else{const r=hit.getBoundingClientRect();send({t:'mousemove',dx:dx/Math.max(1,r.width),dy:dy/Math.max(1,r.height)})}
@@ -306,6 +315,7 @@
   });
   function pointerEnd(e,cancel=false){
     const p=state.pointers.get(e.pointerId);if(!p)return;
+    if(p.edgeBack){state.pointers.delete(e.pointerId);return}
     if(state.mouseMode){
       if(state.pointers.size===1&&!p.moved&&performance.now()-p.at<330)send({t:'button',b:0,a:2});
     }else{const n=normalPoint(e.clientX,e.clientY);send({t:'touch',a:cancel?'cancel':'up',id:e.pointerId%32,x:n.x,y:n.y})}
@@ -319,17 +329,18 @@
     return{x:Math.max(0,Math.min(1,(x-r.left-l)/Math.max(1,dw))),y:Math.max(0,Math.min(1,(y-r.top-t)/Math.max(1,dh)))};
   }
 
-  $('#modeBtn').onclick=()=>{state.mouseMode=!state.mouseMode;localStorage.setItem('tdweb.mouse',state.mouseMode?'1':'0');state.pointers.clear();updateModeButton()};
-  function updateModeButton(){const b=$('#modeBtn');b.classList.toggle('active',state.mouseMode);b.innerHTML=(state.mouseMode?'🖱<span>Мышь</span>':'☝️<span>Сенсор</span>')}
+  const modeBtn=$('#modeBtn');
+  if(modeBtn) modeBtn.onclick=()=>{state.mouseMode=!state.mouseMode;localStorage.setItem('tdweb.mouse',state.mouseMode?'1':'0');state.pointers.clear();updateModeButton()};
+  function updateModeButton(){const b=$('#modeBtn');if(!b)return;b.classList.toggle('active',state.mouseMode);b.innerHTML=(state.mouseMode?'🖱<span>Мышь</span>':'☝️<span>Сенсор</span>')}
 
   let holdLeft=false;
-  $('#lmbBtn').addEventListener('pointerdown',e=>{e.preventDefault();holdLeft=true;send({t:'button',b:0,a:0})});
-  $('#lmbBtn').addEventListener('pointerup',e=>{e.preventDefault();if(holdLeft){holdLeft=false;send({t:'button',b:0,a:1})}});
-  $('#lmbBtn').addEventListener('pointercancel',()=>{if(holdLeft){holdLeft=false;send({t:'button',b:0,a:1})}});
-  $('#rmbBtn').onclick=()=>send({t:'button',b:1,a:2});
+  $('#lmbBtn')?.addEventListener('pointerdown',e=>{e.preventDefault();holdLeft=true;send({t:'button',b:0,a:0})});
+  $('#lmbBtn')?.addEventListener('pointerup',e=>{e.preventDefault();if(holdLeft){holdLeft=false;send({t:'button',b:0,a:1})}});
+  $('#lmbBtn')?.addEventListener('pointercancel',()=>{if(holdLeft){holdLeft=false;send({t:'button',b:0,a:1})}});
+  const rmbBtn=$('#rmbBtn'); if(rmbBtn) rmbBtn.onclick=()=>send({t:'button',b:1,a:2});
 
   const sink=$('#keyboardSink');
-  $('#keyboardBtn').onclick=()=>sink.focus({preventScroll:true});
+  const keyboardBtn=$('#keyboardBtn'); if(keyboardBtn) keyboardBtn.onclick=()=>sink.focus({preventScroll:true});
   sink.addEventListener('input',()=>{if(sink.value){send({t:'text',v:sink.value});sink.value=''}});
   sink.addEventListener('keydown',e=>{if(['Enter','Backspace','Escape','Tab','Delete','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(e.key)){send({t:'key',v:e.key});e.preventDefault()}});
 
