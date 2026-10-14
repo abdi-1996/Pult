@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>TouchDisplayMobileWeb</AssemblyName>
+    <RootNamespace>TouchDisplayMobileWeb</RootNamespace>
+    <PublishSingleFile>true</PublishSingleFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="wwwroot\index.html" />
+    <EmbeddedResource Include="wwwroot\app.css" />
+    <EmbeddedResource Include="wwwroot\app.js" />
+    <EmbeddedResource Include="wwwroot\manifest.webmanifest" />
+    <EmbeddedResource Include="wwwroot\icon.svg" />
+  </ItemGroup>
+</Project>
