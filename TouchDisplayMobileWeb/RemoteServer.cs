@@ -194,7 +194,7 @@ internal sealed class RemoteServer
             gpu = new { percent = Math.Round(s.GpuPercent), memory = Math.Round(s.GpuMemoryPercent), name = s.GpuName },
             ram = new { percent = Math.Round(s.RamPercent), used = Math.Round(s.RamUsedGb, 1), total = Math.Round(s.RamTotalGb, 1) },
             network = new { down = Math.Round(s.DownMbps, 1), up = Math.Round(s.UpMbps, 1) },
-            version = "1.2.5"
+            version = "1.2.6"
         }, token);
     }
 
@@ -483,6 +483,9 @@ internal sealed class RemoteServer
                             root.TryGetProperty("w", out var pw) ? pw.GetInt32() : 0,
                             root.TryGetProperty("h", out var ph) ? ph.GetInt32() : 0,
                             root.TryGetProperty("dpr", out var pd) ? pd.GetDouble() : 1.0);
+                        break;
+                    case "profile-reset":
+                        adaptiveDisplay.Restore();
                         break;
                     case "touch":
                         TouchController.Inject(
