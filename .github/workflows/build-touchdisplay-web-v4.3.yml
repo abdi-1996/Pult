@@ -1,0 +1,38 @@
+name: Build TouchDisplay v4.3 Web Remote
+
+on:
+  push:
+    branches: [touchdisplay-v4-lowlatency]
+    paths:
+      - 'TouchDisplayHost/WebRemoteServer.cs'
+      - 'TouchDisplayHost/patch-v4.3.ps1'
+      - '.github/workflows/build-touchdisplay-web-v4.3.yml'
+  workflow_dispatch:
+
+jobs:
+  windows-web:
+    name: Windows Host v4.3 Native + Web
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Apply v4.3 patches
+        shell: pwsh
+        run: ./TouchDisplayHost/patch-v4.3.ps1
+      - name: Build one self-contained EXE
+        shell: pwsh
+        run: |
+          dotnet restore TouchDisplayHost/TouchDisplayHost.csproj
+          dotnet publish TouchDisplayHost/TouchDisplayHost.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o TouchDisplayHost/out
+          Copy-Item TouchDisplayHost/out/TouchDisplayHost.exe TouchDisplayHost-v4.3-Web.exe
+          Get-Item TouchDisplayHost-v4.3-Web.exe | Format-List Name,Length
+      - name: Upload Host
+        uses: actions/upload-artifact@v4
+        with:
+          name: TouchDisplay-Windows-Host-v4.3-Web
+          path: TouchDisplayHost-v4.3-Web.exe
+          if-no-files-found: error
+          retention-days: 30
