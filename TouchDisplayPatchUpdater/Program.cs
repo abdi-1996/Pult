@@ -26,7 +26,7 @@ internal static class Program
                 MessageBox.Show(
                     "В выбранной папке не найдена версия TouchDisplay с отдельными файлами.\n\n" +
                     "Сначала должна быть установлена версия v1.2.",
-                    "TouchDisplay Update v1.2.2",
+                    "TouchDisplay Update v1.2.3",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
                 return;
@@ -39,14 +39,14 @@ internal static class Program
                 "• wwwroot\\app.css\n" +
                 "• wwwroot\\index.html\n\n" +
                 "Остальные файлы приложения и настройки не меняются.",
-                "TouchDisplay Update v1.2.2",
+                "TouchDisplay Update v1.2.3",
                 MessageBoxButtons.OKCancel,
                 MessageBoxIcon.Information) != DialogResult.OK)
                 return;
 
             StopApp(target);
 
-            var backup = Path.Combine(target, "Backup", "ui-v1.2.2-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+            var backup = Path.Combine(target, "Backup", "ui-v1.2.3-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
             Directory.CreateDirectory(backup);
 
             PatchFile(web, backup, "app.js", "TouchDisplayPatch.app.js");
@@ -75,7 +75,7 @@ internal static class Program
             MessageBox.Show(
                 "Готово. Исправлены вкладки и кнопки.\n\n" +
                 "На iPhone полностью закрой старую вкладку/PWA TouchDisplay и открой снова.",
-                "TouchDisplay v1.2.2",
+                "TouchDisplay v1.2.3",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         }
@@ -83,7 +83,7 @@ internal static class Program
         {
             MessageBox.Show(
                 "Не удалось установить обновление.\n\n" + ex.Message,
-                "TouchDisplay Update v1.2.2",
+                "TouchDisplay Update v1.2.3",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
@@ -95,7 +95,7 @@ internal static class Program
 
         using var form = new Form
         {
-            Text = "TouchDisplay Update v1.2.2",
+            Text = "TouchDisplay Update v1.2.3",
             ClientSize = new Size(660, 210),
             FormBorderStyle = FormBorderStyle.FixedDialog,
             MaximizeBox = false,
