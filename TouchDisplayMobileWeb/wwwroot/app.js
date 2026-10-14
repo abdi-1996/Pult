@@ -108,15 +108,34 @@
   }
 
   function go(name) {
-    $$('.page').forEach(p => p.classList.remove('active'));
-    $$('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.go === name));
+    $('.page').forEach(p => p.classList.remove('active'));
+    $('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.go === name));
     const page = $('#page' + name[0].toUpperCase() + name.slice(1));
     if (page) page.classList.add('active');
+
+    const desktopMode = name === 'desktop';
+    app.classList.toggle('desktop-mode', desktopMode);
+    document.documentElement.style.background = desktopMode ? '#000' : '';
+    document.body.style.background = desktopMode ? '#000' : '';
+
     if (name === 'files') loadFiles(state.currentPath || '');
     if (name === 'gallery') loadRecent();
-    if (name === 'desktop') startDesktop(); else stopDesktop();
+    if (desktopMode) {
+      $('#desktopQuickMenu')?.classList.add('hidden');
+      startDesktop();
+    } else {
+      stopDesktop();
+    }
   }
-  $$('[data-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
+  $('[data-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
+
+  $('#desktopMenuBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    $('#desktopQuickMenu')?.classList.toggle('hidden');
+  });
+  $('#desktopStage')?.addEventListener('pointerdown', () => {
+    $('#desktopQuickMenu')?.classList.add('hidden');
+  }, {capture:true});
 
   function fmtSize(n) {
     if (!n) return '';
