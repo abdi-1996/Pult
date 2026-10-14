@@ -16,7 +16,7 @@
     decoding: false,
     statsTimer: null,
     latency: null,
-    desktopFill: false
+    desktopFill: true
   };
 
   const login = $('#login'), app = $('#app'), pinInput = $('#pin'), loginError = $('#loginError');
@@ -126,8 +126,7 @@
     if (name === 'files') loadFiles(state.currentPath || '');
     if (name === 'gallery') loadRecent();
     if (desktopMode) {
-      state.desktopFill = false;
-      updateDesktopViewMode();
+      state.desktopFill = true;
       startDesktop();
     } else {
       stopDesktop();
@@ -249,7 +248,7 @@
     let vo=false,co=false;
     const ready=()=>{if(vo&&co)$('#desktopConnecting').style.display='none'};
     v.onopen=()=>{vo=true;ready()};
-    c.onopen=()=>{co=true;if(state.desktopFill)sendDisplayProfile();ready()};
+    c.onopen=()=>{co=true;sendDisplayProfile();ready()};
     v.onmessage=e=>queueFrame(e.data);
     const closed=()=>{ if ($('#pageDesktop').classList.contains('active')) { $('#desktopConnecting').textContent='Переподключение…'; $('#desktopConnecting').style.display='grid'; setTimeout(()=>{stopDesktop();startDesktop()},900); } };
     v.onclose=closed; c.onclose=closed; v.onerror=()=>{}; c.onerror=()=>{};
@@ -263,34 +262,13 @@
   }
 
   function sendDisplayProfile() {
-    if (!state.desktopFill || !state.control || state.control.readyState !== 1) return;
+    if (!state.control || state.control.readyState !== 1) return;
     const vv = window.visualViewport;
     const w = Math.max(1, Math.round(vv?.width || window.innerWidth || screen.width || 1));
     const h = Math.max(1, Math.round(vv?.height || window.innerHeight || screen.height || 1));
     const dpr = Math.max(1, Math.min(4, window.devicePixelRatio || 1));
     send({t:'profile',w,h,dpr});
   }
-
-  function resetDisplayProfile() {
-    if (state.control && state.control.readyState === 1) send({t:'profile-reset'});
-  }
-
-  function updateDesktopViewMode() {
-    const b = $('#desktopFullscreenBtn');
-    if (!b) return;
-    b.classList.toggle('active', state.desktopFill);
-    b.innerHTML = state.desktopFill ? '▣ <span>Обычный экран</span>' : '⛶ <span>Во весь экран</span>';
-    b.setAttribute('aria-label', state.desktopFill ? 'Обычный экран' : 'Во весь экран');
-  }
-
-  $('#desktopFullscreenBtn')?.addEventListener('click', e => {
-    e.preventDefault();
-    e.stopPropagation();
-    state.desktopFill = !state.desktopFill;
-    updateDesktopViewMode();
-    if (state.desktopFill) sendDisplayProfile();
-    else resetDisplayProfile();
-  });
 
   $('#desktopExitBtn')?.addEventListener('click', e => {
     e.preventDefault();
@@ -302,7 +280,7 @@
   function scheduleDisplayProfile() {
     clearTimeout(profileTimer);
     profileTimer = setTimeout(() => {
-      if (state.desktopFill && $('#pageDesktop').classList.contains('active')) sendDisplayProfile();
+      if ($('#pageDesktop').classList.contains('active')) sendDisplayProfile();
     }, 450);
   }
   window.addEventListener('orientationchange', scheduleDisplayProfile);
@@ -332,7 +310,7 @@
     if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
     const ctx=canvas.getContext('2d',{alpha:false});
     ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);
-    const s=state.desktopFill ? Math.max(w/bmp.width,h/bmp.height) : Math.min(w/bmp.width,h/bmp.height);
+    const s=Math.max(w/bmp.width,h/bmp.height);
     const dw=bmp.width*s,dh=bmp.height*s,x=(w-dw)/2,y=(h-dh)/2;
     ctx.drawImage(bmp,x,y,dw,dh);
   }
@@ -345,22 +323,13 @@
   hit.addEventListener('contextmenu',e=>e.preventDefault());
   hit.addEventListener('pointerdown',e=>{
     try{hit.setPointerCapture(e.pointerId)}catch{}
-    const edgeBack = e.clientX <= 18;
-    state.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,at:performance.now(),moved:false,edgeBack,edgeDone:false});
-    if(!state.mouseMode && !edgeBack){const p=normalPoint(e.clientX,e.clientY);send({t:'touch',a:'down',id:e.pointerId%32,x:p.x,y:p.y})}
+    state.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,at:performance.now(),moved:false});
+    if(!state.mouseMode){const p=normalPoint(e.clientX,e.clientY);send({t:'touch',a:'down',id:e.pointerId%32,x:p.x,y:p.y})}
   });
   hit.addEventListener('pointermove',e=>{
     const p=state.pointers.get(e.pointerId);if(!p)return;
     const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
     if(Math.hypot(e.clientX-p.sx,e.clientY-p.sy)>5)p.moved=true;
-    if(p.edgeBack){
-      if(!p.edgeDone && e.clientX-p.sx>88 && Math.abs(e.clientY-p.sy)<100){
-        p.edgeDone=true;
-        state.pointers.clear();
-        go('home');
-      }
-      return;
-    }
     if(state.mouseMode){
       if(state.pointers.size>=2){const d=Math.round(-dy*7);if(d)send({t:'wheel',d})}
       else{const r=hit.getBoundingClientRect();send({t:'mousemove',dx:dx/Math.max(1,r.width),dy:dy/Math.max(1,r.height)})}
@@ -368,7 +337,6 @@
   });
   function pointerEnd(e,cancel=false){
     const p=state.pointers.get(e.pointerId);if(!p)return;
-    if(p.edgeBack){state.pointers.delete(e.pointerId);return}
     if(state.mouseMode){
       if(state.pointers.size===1&&!p.moved&&performance.now()-p.at<330)send({t:'button',b:0,a:2});
     }else{const n=normalPoint(e.clientX,e.clientY);send({t:'touch',a:cancel?'cancel':'up',id:e.pointerId%32,x:n.x,y:n.y})}
@@ -379,7 +347,7 @@
 
   function normalPoint(x,y){
     const r=hit.getBoundingClientRect(),iw=state.frameSize.w,ih=state.frameSize.h;
-    const s=state.desktopFill ? Math.max(r.width/iw,r.height/ih) : Math.min(r.width/iw,r.height/ih);
+    const s=Math.max(r.width/iw,r.height/ih);
     const dw=iw*s,dh=ih*s,l=(r.width-dw)/2,t=(r.height-dh)/2;
     return{x:Math.max(0,Math.min(1,(x-r.left-l)/Math.max(1,dw))),y:Math.max(0,Math.min(1,(y-r.top-t)/Math.max(1,dh)))};
   }
