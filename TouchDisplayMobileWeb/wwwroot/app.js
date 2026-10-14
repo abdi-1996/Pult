@@ -127,7 +127,16 @@
       stopDesktop();
     }
   }
-  $('[data-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
+  // Reliable delegated navigation for Safari/PWA and nested button elements.
+  document.addEventListener('click', (e) => {
+    const target = e.target instanceof Element ? e.target.closest('[data-go]') : null;
+    if (!target) return;
+    const name = target.getAttribute('data-go');
+    if (!name) return;
+    e.preventDefault();
+    e.stopPropagation();
+    go(name);
+  }, true);
 
   $('#desktopMenuBtn')?.addEventListener('click', (e) => {
     e.stopPropagation();
