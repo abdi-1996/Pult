@@ -83,3 +83,13 @@ radial-gradient(circle at 100% 30%,#0b2744 0,transparent 28%),var(--bg)}
 .bottom-nav{z-index:1000!important;pointer-events:auto!important}
 .app:not(.desktop-mode) .bottom-nav{display:grid!important}
 .app.desktop-mode .bottom-nav{display:none!important}
+
+
+/* v1.2.4 — clean fullscreen desktop: video only, no visible dock or overlays */
+.app.desktop-mode #pageDesktop{inset:0!important;padding:0!important;background:#000}
+.app.desktop-mode .desktop-stage{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;background:#000}
+.app.desktop-mode .desktop-overlay-top,
+.app.desktop-mode .desktop-quick-menu,
+.app.desktop-mode .desktop-controls-wrap{display:none!important}
+.app.desktop-mode #desktopCanvas,
+.app.desktop-mode #desktopHit{position:absolute!important;inset:0!important;width:100%!important;height:100%!important}
