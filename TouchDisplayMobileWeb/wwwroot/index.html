@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#080b11">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TouchDisplay">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg">
+  <link rel="stylesheet" href="/app.css">
+  <title>TouchDisplay</title>
+</head>
+<body>
+  <div id="login" class="screen login-screen">
+    <div class="brand brand-large">
+      <div class="win-logo">⊞</div>
+      <div><strong>Touch<span>Display</span></strong><small>Mobile Windows</small></div>
+    </div>
+    <div class="connect-card panel">
+      <div class="pc-preview">
+        <div class="pc-thumb">⊞</div>
+        <div>
+          <h2 id="loginPcName">Мой ПК</h2>
+          <div class="online"><i></i>Готов к подключению</div>
+          <p>LAN / Tailscale</p>
+        </div>
+      </div>
+      <label class="field-label">PIN-код</label>
+      <div class="pin-row">
+        <input id="pin" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••">
+        <button id="showPin" class="icon-btn" aria-label="Показать PIN">◉</button>
+      </div>
+      <button id="connect" class="primary-btn">Подключиться</button>
+      <div id="loginError" class="error"></div>
+    </div>
+    <div class="login-note">После первого входа PIN запомнится на этом iPhone</div>
+  </div>
+
+  <div id="app" class="screen app hidden">
+    <header class="topbar">
+      <div class="brand">
+        <div class="win-logo">⊞</div>
+        <div><strong>Touch<span>Display</span></strong><small id="pcSubtitle">Мой ПК</small></div>
+      </div>
+      <div class="top-actions">
+        <span id="connectionBadge" class="badge online-badge">Online</span>
+        <button id="logout" class="icon-btn">⋯</button>
+      </div>
+    </header>
+
+    <main id="pageHome" class="page active">
+      <section class="panel pc-card">
+        <div class="pc-preview">
+          <div class="pc-thumb">⊞</div>
+          <div class="grow">
+            <h2 id="pcName">Мой ПК</h2>
+            <div class="online"><i></i>Online</div>
+            <p id="pcRoute">Подключено</p>
+          </div>
+          <div class="chev">›</div>
+        </div>
+      </section>
+
+      <section class="stats">
+        <div class="stat panel"><div class="ring green"><b id="gpuPercent">0%</b></div><span>GPU</span><small id="gpuName">GPU</small></div>
+        <div class="stat panel"><div class="ring purple"><b id="ramPercent">0%</b></div><span>RAM</span><small id="ramValue">0 / 0 ГБ</small></div>
+        <div class="stat panel"><div class="ring blue"><b id="netDown">0</b></div><span>Сеть</span><small id="netUp">↑ 0 Мбит/с</small></div>
+      </section>
+
+      <section class="tile-grid">
+        <button class="tile panel accent-purple" data-go="desktop"><div class="tile-icon">⌘</div><div><b>ComfyUI</b><small>Управление через рабочий стол</small></div><span>›</span></button>
+        <button class="tile panel accent-blue" data-go="files"><div class="tile-icon">📁</div><div><b>Файлы</b><small>Проводник Windows</small></div><span>›</span></button>
+        <button class="tile panel accent-pink" data-go="gallery"><div class="tile-icon">▧</div><div><b>Галерея</b><small>Последние файлы</small></div><span>›</span></button>
+        <button class="tile panel accent-cyan" data-go="desktop"><div class="tile-icon">▣</div><div><b>Рабочий стол</b><small>Удалённое управление</small></div><span>›</span></button>
+        <button class="tile panel wide" data-go="system"><div class="tile-icon">⚙</div><div><b>Система</b><small>Состояние и подключение</small></div><span>›</span></button>
+      </section>
+
+      <section class="section-head"><h3>Недавние файлы</h3><button data-go="gallery">Все ›</button></section>
+      <section id="homeRecent" class="recent-strip"></section>
+    </main>
+
+    <main id="pageFiles" class="page">
+      <div class="page-title">
+        <button class="back-btn" id="filesBack">‹</button>
+        <div><h2>Файлы</h2><small id="filesPathLabel">Windows</small></div>
+      </div>
+      <div class="searchbar"><span>⌕</span><input id="fileSearch" placeholder="Поиск файлов и папок…"></div>
+      <div id="breadcrumbs" class="breadcrumbs"></div>
+      <section id="fileList" class="file-list panel"></section>
+    </main>
+
+    <main id="pageGallery" class="page">
+      <div class="page-title"><button class="back-btn" data-go="home">‹</button><div><h2>Галерея</h2><small>Последние файлы</small></div></div>
+      <section id="galleryGrid" class="gallery-grid"></section>
+    </main>
+
+    <main id="pageSystem" class="page">
+      <div class="page-title"><button class="back-btn" data-go="home">‹</button><div><h2>Система</h2><small>TouchDisplay Mobile Web</small></div></div>
+      <section class="panel system-card">
+        <div class="sys-row"><span>ПК</span><b id="sysPc">—</b></div>
+        <div class="sys-row"><span>Пользователь</span><b id="sysUser">—</b></div>
+        <div class="sys-row"><span>LAN</span><b id="sysLan">—</b></div>
+        <div class="sys-row"><span>Tailscale</span><b id="sysTail">—</b></div>
+        <div class="sys-row"><span>Разрешение</span><b id="sysResolution">—</b></div>
+        <div class="sys-row"><span>Версия</span><b id="sysVersion">1.0</b></div>
+      </section>
+      <section class="panel help-card">
+        <h3>Доступ вне дома</h3>
+        <p>Открой этот же TouchDisplay по Tailscale-адресу ПК. После первого входа PIN сохраняется на iPhone.</p>
+      </section>
+    </main>
+
+    <main id="pageDesktop" class="page desktop-page">
+      <div class="desktop-head">
+        <button class="back-btn" data-go="home">‹</button>
+        <div class="grow"><h2>Рабочий стол</h2><small id="desktopInfo">Подключение…</small></div>
+        <span id="desktopLatency" class="latency">—</span>
+      </div>
+      <div id="desktopStage" class="desktop-stage">
+        <canvas id="desktopCanvas"></canvas>
+        <div id="desktopHit" class="desktop-hit"></div>
+        <div id="desktopConnecting" class="desktop-connecting">Подключение к экрану…</div>
+      </div>
+      <div class="desktop-controls panel">
+        <button id="modeBtn" class="control active">🖱<span>Мышь</span></button>
+        <button id="lmbBtn" class="control">◐<span>ЛКМ</span></button>
+        <button id="rmbBtn" class="control">◑<span>ПКМ</span></button>
+        <button id="keyboardBtn" class="control">⌨<span>Клавиатура</span></button>
+      </div>
+      <input id="keyboardSink" class="keyboard-sink" autocapitalize="off" autocomplete="off" spellcheck="false">
+    </main>
+
+    <nav class="bottom-nav">
+      <button data-go="home" class="nav-btn active"><span>⌂</span><small>Главная</small></button>
+      <button data-go="files" class="nav-btn"><span>📁</span><small>Файлы</small></button>
+      <button data-go="desktop" class="nav-btn"><span>▣</span><small>Рабочий стол</small></button>
+      <button data-go="system" class="nav-btn"><span>⚙</span><small>Система</small></button>
+    </nav>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
