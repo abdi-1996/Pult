@@ -108,8 +108,8 @@
   }
 
   function go(name) {
-    $('.page').forEach(p => p.classList.remove('active'));
-    $('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.go === name));
+    $$('.page').forEach(p => p.classList.remove('active'));
+    $$('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.go === name));
     const page = $('#page' + name[0].toUpperCase() + name.slice(1));
     if (page) page.classList.add('active');
 
