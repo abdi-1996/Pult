@@ -7,19 +7,22 @@ namespace TouchDisplayMobileWeb;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
         NativeMethods.SetProcessDpiAwarenessContext(new IntPtr(-4));
         ApplicationConfiguration.Initialize();
 
+        var autoStartLaunch = args.Any(a => string.Equals(a, "--autostart", StringComparison.OrdinalIgnoreCase));
+
         using var mutex = new Mutex(true, "TouchDisplayMobileWeb.Singleton", out var first);
         if (!first)
         {
-            MessageBox.Show("TouchDisplay Mobile Web уже запущен.", "TouchDisplay", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (!autoStartLaunch)
+                MessageBox.Show("TouchDisplay Mobile Web уже запущен.", "TouchDisplay", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
-        Application.Run(new HostForm());
+        Application.Run(new HostForm(autoStartLaunch));
     }
 }
 
@@ -34,12 +37,15 @@ internal sealed class HostForm : Form
     private readonly Button _firewall = new();
     private RemoteServer? _server;
     private readonly string _pin;
+    private readonly bool _autoStartLaunch;
+    private NotifyIcon? _trayIcon;
 
-    public HostForm()
+    public HostForm(bool autoStartLaunch = false)
     {
+        _autoStartLaunch = autoStartLaunch;
         _pin = SettingsStore.LoadOrCreatePin();
 
-        Text = "TouchDisplay Mobile Web v1.2";
+        Text = "TouchDisplay Mobile Web v1.2.12";
         ClientSize = new Size(640, 455);
         MinimumSize = new Size(640, 455);
         StartPosition = FormStartPosition.CenterScreen;
@@ -114,19 +120,79 @@ internal sealed class HostForm : Form
 
         Shown += (_, _) =>
         {
-            if (!SettingsStore.HasAutoStartPreference())
+            try
             {
-                try
-                {
+                if (!SettingsStore.HasAutoStartPreference())
                     SettingsStore.SetAutoStart(true);
-                    _autoStart.Checked = true;
-                }
-                catch { }
+                _autoStart.Checked = SettingsStore.IsAutoStartEnabled();
             }
+            catch { }
+
             StartServer();
+            SetupTray();
+
+            if (_autoStartLaunch)
+            {
+                BeginInvoke(() =>
+                {
+                    Hide();
+                    ShowInTaskbar = false;
+                });
+            }
         };
 
-        FormClosing += (_, _) => _server?.Stop();
+        FormClosing += (_, e) =>
+        {
+            if (e.CloseReason == CloseReason.UserClosing && _trayIcon is not null)
+            {
+                e.Cancel = true;
+                Hide();
+                ShowInTaskbar = false;
+                return;
+            }
+
+            _server?.Stop();
+            if (_trayIcon is not null)
+            {
+                _trayIcon.Visible = false;
+                _trayIcon.Dispose();
+                _trayIcon = null;
+            }
+        };
+    }
+
+    private void SetupTray()
+    {
+        if (_trayIcon is not null) return;
+
+        var menu = new ContextMenuStrip();
+        menu.Items.Add("Открыть TouchDisplay", null, (_, _) => ShowFromTray());
+        menu.Items.Add("Открыть Web", null, (_, _) => OpenLocalWeb());
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Выход", null, (_, _) =>
+        {
+            _trayIcon!.Visible = false;
+            _trayIcon.Dispose();
+            _trayIcon = null;
+            Application.Exit();
+        });
+
+        _trayIcon = new NotifyIcon
+        {
+            Text = "TouchDisplay Mobile Web",
+            Icon = SystemIcons.Application,
+            Visible = true,
+            ContextMenuStrip = menu
+        };
+        _trayIcon.DoubleClick += (_, _) => ShowFromTray();
+    }
+
+    private void ShowFromTray()
+    {
+        ShowInTaskbar = true;
+        Show();
+        WindowState = FormWindowState.Normal;
+        Activate();
     }
 
     private static Label Label(string text, float size, FontStyle style, Color? color = null) => new()
