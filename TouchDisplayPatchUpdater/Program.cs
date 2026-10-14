@@ -26,7 +26,7 @@ internal static class Program
                 MessageBox.Show(
                     "В выбранной папке не найдена версия TouchDisplay с отдельными файлами.\n\n" +
                     "Сначала должна быть установлена версия v1.2.",
-                    "TouchDisplay Update v1.2.4",
+                    "TouchDisplay Update v1.2.5",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
                 return;
@@ -34,28 +34,30 @@ internal static class Program
 
             if (MessageBox.Show(
                 "Обновить полноэкранный режим рабочего стола TouchDisplay?\n\n" +
-                "Будут обновлены только файлы интерфейса:\n" +
+                "Будут обновлены файлы Adaptive Display и интерфейса:\n" +
+                "• TouchDisplayMobileWeb.dll\n" +
                 "• wwwroot\\app.js\n" +
                 "• wwwroot\\app.css\n" +
                 "• wwwroot\\index.html\n\n" +
-                "Остальные файлы приложения и настройки не меняются.",
-                "TouchDisplay Update v1.2.4",
+                "PIN, настройки и остальные файлы приложения не меняются.",
+                "TouchDisplay Update v1.2.5",
                 MessageBoxButtons.OKCancel,
                 MessageBoxIcon.Information) != DialogResult.OK)
                 return;
 
             StopApp(target);
 
-            var backup = Path.Combine(target, "Backup", "ui-v1.2.4-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+            var backup = Path.Combine(target, "Backup", "ui-v1.2.5-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
             Directory.CreateDirectory(backup);
 
+            PatchRootFile(target, backup, "TouchDisplayMobileWeb.dll", "TouchDisplayPatch.TouchDisplayMobileWeb.dll");
             PatchFile(web, backup, "app.js", "TouchDisplayPatch.app.js");
             PatchFile(web, backup, "app.css", "TouchDisplayPatch.app.css");
             PatchFile(web, backup, "index.html", "TouchDisplayPatch.index.html");
 
             var data = Path.Combine(target, "data");
             Directory.CreateDirectory(data);
-            File.WriteAllText(Path.Combine(data, "version.txt"), "1.2.4");
+            File.WriteAllText(Path.Combine(data, "version.txt"), "1.2.5");
 
             var exe = Path.Combine(target, AppExe);
             var p = Process.Start(new ProcessStartInfo
@@ -73,9 +75,10 @@ internal static class Program
                 throw new InvalidOperationException("TouchDisplay закрылся сразу после запуска.");
 
             MessageBox.Show(
-                "Готово. Рабочий стол теперь чистый полноэкранный — без док-панели и лишних элементов.\n\n" +
+                "Готово. Adaptive Display включён.\n\n" +
+                "При открытии рабочего стола Windows подберёт ориентацию и ближайшее поддерживаемое разрешение под экран смартфона, сохраняя пропорции без искажений. После выхода исходный режим монитора вернётся автоматически.\n\n" +
                 "На iPhone полностью закрой старую вкладку/PWA TouchDisplay и открой снова.",
-                "TouchDisplay v1.2.4",
+                "TouchDisplay v1.2.5",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         }
@@ -83,7 +86,7 @@ internal static class Program
         {
             MessageBox.Show(
                 "Не удалось установить обновление.\n\n" + ex.Message,
-                "TouchDisplay Update v1.2.4",
+                "TouchDisplay Update v1.2.5",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
@@ -95,7 +98,7 @@ internal static class Program
 
         using var form = new Form
         {
-            Text = "TouchDisplay Update v1.2.4",
+            Text = "TouchDisplay Update v1.2.5",
             ClientSize = new Size(660, 210),
             FormBorderStyle = FormBorderStyle.FixedDialog,
             MaximizeBox = false,
@@ -256,6 +259,21 @@ internal static class Program
             }
             catch { }
         }
+    }
+
+    private static void PatchRootFile(string targetRoot, string backupRoot, string name, string resourceName)
+    {
+        var destination = Path.Combine(targetRoot, name);
+        var backup = Path.Combine(backupRoot, name);
+
+        if (File.Exists(destination))
+            File.Copy(destination, backup, true);
+
+        var asm = Assembly.GetExecutingAssembly();
+        using var source = asm.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException("В обновлении отсутствует " + name);
+        using var output = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None);
+        source.CopyTo(output);
     }
 
     private static void PatchFile(string webRoot, string backupRoot, string name, string resourceName)
