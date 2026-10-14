@@ -1,34 +1,63 @@
-name: Build TouchDisplay Mobile Web v1.1.1 Navigation Fix
+name: Build TouchDisplay Mobile Web v1.2 Updater
 
 on:
   push:
     branches: [touchdisplay-mobile-web-v1]
     paths:
       - 'TouchDisplayMobileWeb/**'
+      - 'TouchDisplayUpdater/**'
       - '.github/workflows/build-touchdisplay-mobile-web-v1.yml'
   workflow_dispatch:
 
 jobs:
   build:
-    name: Windows EXE
+    name: Folder App + Update EXE
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Build self-contained EXE
+
+      - name: Publish folder-based TouchDisplay
         shell: pwsh
         run: |
           dotnet restore TouchDisplayMobileWeb/TouchDisplayMobileWeb.csproj
-          dotnet publish TouchDisplayMobileWeb/TouchDisplayMobileWeb.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o TouchDisplayMobileWeb/out
-          Copy-Item TouchDisplayMobileWeb/out/TouchDisplayMobileWeb.exe TouchDisplay-Mobile-Web-v1.1.1.exe
-          Get-Item TouchDisplay-Mobile-Web-v1.1.1.exe | Format-List Name,Length
-      - name: Upload
+          dotnet publish TouchDisplayMobileWeb/TouchDisplayMobileWeb.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o stage/TouchDisplay
+          New-Item -ItemType Directory -Force -Path stage/TouchDisplay/data | Out-Null
+          Set-Content -Path stage/TouchDisplay/data/version.txt -Value "1.2" -Encoding ASCII
+          if (!(Test-Path stage/TouchDisplay/TouchDisplayMobileWeb.exe)) { throw "Main EXE missing" }
+          if (!(Test-Path stage/TouchDisplay/wwwroot/index.html)) { throw "wwwroot missing" }
+
+      - name: Create full folder package
+        shell: pwsh
+        run: |
+          Compress-Archive -Path stage/TouchDisplay/* -DestinationPath TouchDisplay-Mobile-Web-v1.2-Folder.zip -CompressionLevel Optimal
+
+      - name: Build one-file updater with embedded payload
+        shell: pwsh
+        run: |
+          Compress-Archive -Path stage/TouchDisplay/* -DestinationPath TouchDisplayUpdater/payload.zip -CompressionLevel Optimal
+          dotnet restore TouchDisplayUpdater/TouchDisplayUpdater.csproj
+          dotnet publish TouchDisplayUpdater/TouchDisplayUpdater.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o stage/Updater
+          Copy-Item stage/Updater/TouchDisplay-Update-v1.2.exe TouchDisplay-Update-v1.2.exe
+          Get-Item TouchDisplay-Update-v1.2.exe | Format-List Name,Length
+          Get-Item TouchDisplay-Mobile-Web-v1.2-Folder.zip | Format-List Name,Length
+
+      - name: Upload updater
         uses: actions/upload-artifact@v4
         with:
-          name: TouchDisplay-Mobile-Web-v1.1
-          path: TouchDisplay-Mobile-Web-v1.1.1.exe
+          name: TouchDisplay-Update-v1.2
+          path: TouchDisplay-Update-v1.2.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload full app folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: TouchDisplay-Mobile-Web-v1.2-Folder
+          path: TouchDisplay-Mobile-Web-v1.2-Folder.zip
           if-no-files-found: error
           retention-days: 30
