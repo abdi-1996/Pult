@@ -1,4 +1,4 @@
-name: Build TouchDisplay UI Patch v1.2.1
+name: Build TouchDisplay UI Patch v1.2.2 Folder Picker
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
     paths:
       - 'TouchDisplayMobileWeb/wwwroot/**'
       - 'TouchDisplayPatchUpdater/**'
-      - '.github/workflows/build-touchdisplay-patch-v1.2.1.yml'
+      - '.github/workflows/build-touchdisplay-patch-v1.2.2.yml'
   workflow_dispatch:
 
 jobs:
@@ -26,13 +26,13 @@ jobs:
         run: |
           dotnet restore TouchDisplayPatchUpdater/TouchDisplayPatchUpdater.csproj
           dotnet publish TouchDisplayPatchUpdater/TouchDisplayPatchUpdater.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o out
-          Copy-Item out/TouchDisplay-Update-v1.2.1.exe TouchDisplay-Update-v1.2.1.exe
-          Get-Item TouchDisplay-Update-v1.2.1.exe | Format-List Name,Length
+          Copy-Item out/TouchDisplay-Update-v1.2.2.exe TouchDisplay-Update-v1.2.2.exe
+          Get-Item TouchDisplay-Update-v1.2.2.exe | Format-List Name,Length
 
       - name: Upload patch
         uses: actions/upload-artifact@v4
         with:
-          name: TouchDisplay-Update-v1.2.1
-          path: TouchDisplay-Update-v1.2.1.exe
+          name: TouchDisplay-Update-v1.2.2
+          path: TouchDisplay-Update-v1.2.2.exe
           if-no-files-found: error
           retention-days: 30
