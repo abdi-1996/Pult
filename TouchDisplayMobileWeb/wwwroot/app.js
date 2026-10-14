@@ -258,7 +258,9 @@
   function stopDesktop() {
     try{state.video?.close()}catch{}
     try{state.control?.close()}catch{}
-    state.video=null; state.control=null; state.pointers.clear();
+    state.video=null; state.control=null;
+    state.pointers.forEach(p=>{if(p.longTimer)clearTimeout(p.longTimer)});
+    state.pointers.clear();
   }
 
   function sendDisplayProfile() {
@@ -338,25 +340,76 @@
 
   const hit=$('#desktopHit');
   hit.addEventListener('contextmenu',e=>e.preventDefault());
+  const LONG_PRESS_MS=560;
+  const LONG_PRESS_MOVE=10;
+
   hit.addEventListener('pointerdown',e=>{
     try{hit.setPointerCapture(e.pointerId)}catch{}
-    state.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,at:performance.now(),moved:false});
-    if(!state.mouseMode){const p=normalPoint(e.clientX,e.clientY);send({t:'touch',a:'down',id:e.pointerId%32,x:p.x,y:p.y})}
+    const pointer={
+      x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,
+      at:performance.now(),moved:false,longPressed:false,longTimer:null
+    };
+    state.pointers.set(e.pointerId,pointer);
+
+    if(state.pointers.size>1){
+      state.pointers.forEach(p=>{if(p.longTimer){clearTimeout(p.longTimer);p.longTimer=null}});
+    }else{
+      pointer.longTimer=setTimeout(()=>{
+        const p=state.pointers.get(e.pointerId);
+        if(!p||p.moved||state.pointers.size!==1)return;
+        p.longPressed=true;
+        p.longTimer=null;
+
+        if(state.mouseMode){
+          send({t:'button',b:1,a:2});
+        }else{
+          const n=normalPoint(p.x,p.y);
+          send({t:'touch',a:'cancel',id:e.pointerId%32,x:n.x,y:n.y});
+          send({t:'rightclick',x:n.x,y:n.y});
+        }
+      },LONG_PRESS_MS);
+    }
+
+    if(!state.mouseMode){
+      const p=normalPoint(e.clientX,e.clientY);
+      send({t:'touch',a:'down',id:e.pointerId%32,x:p.x,y:p.y});
+    }
   });
   hit.addEventListener('pointermove',e=>{
     const p=state.pointers.get(e.pointerId);if(!p)return;
     const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
-    if(Math.hypot(e.clientX-p.sx,e.clientY-p.sy)>5)p.moved=true;
+    if(Math.hypot(e.clientX-p.sx,e.clientY-p.sy)>LONG_PRESS_MOVE){
+      p.moved=true;
+      if(p.longTimer){clearTimeout(p.longTimer);p.longTimer=null}
+    }
+    if(p.longPressed)return;
+
     if(state.mouseMode){
-      if(state.pointers.size>=2){const d=Math.round(-dy*7);if(d)send({t:'wheel',d})}
-      else{const r=hit.getBoundingClientRect();send({t:'mousemove',dx:dx/Math.max(1,r.width),dy:dy/Math.max(1,r.height)})}
-    }else{const n=normalPoint(e.clientX,e.clientY);send({t:'touch',a:'move',id:e.pointerId%32,x:n.x,y:n.y})}
+      if(state.pointers.size>=2){
+        state.pointers.forEach(q=>{if(q.longTimer){clearTimeout(q.longTimer);q.longTimer=null}});
+        const d=Math.round(-dy*7);if(d)send({t:'wheel',d})
+      }else{
+        const r=hit.getBoundingClientRect();
+        send({t:'mousemove',dx:dx/Math.max(1,r.width),dy:dy/Math.max(1,r.height)})
+      }
+    }else{
+      const n=normalPoint(e.clientX,e.clientY);
+      send({t:'touch',a:'move',id:e.pointerId%32,x:n.x,y:n.y})
+    }
   });
   function pointerEnd(e,cancel=false){
     const p=state.pointers.get(e.pointerId);if(!p)return;
-    if(state.mouseMode){
-      if(state.pointers.size===1&&!p.moved&&performance.now()-p.at<330)send({t:'button',b:0,a:2});
-    }else{const n=normalPoint(e.clientX,e.clientY);send({t:'touch',a:cancel?'cancel':'up',id:e.pointerId%32,x:n.x,y:n.y})}
+    if(p.longTimer){clearTimeout(p.longTimer);p.longTimer=null}
+
+    if(!p.longPressed){
+      if(state.mouseMode){
+        if(state.pointers.size===1&&!p.moved&&performance.now()-p.at<330)send({t:'button',b:0,a:2});
+      }else{
+        const n=normalPoint(e.clientX,e.clientY);
+        send({t:'touch',a:cancel?'cancel':'up',id:e.pointerId%32,x:n.x,y:n.y})
+      }
+    }
+
     state.pointers.delete(e.pointerId);
   }
   hit.addEventListener('pointerup',e=>pointerEnd(e,false));
