@@ -67,3 +67,19 @@ radial-gradient(circle at 100% 30%,#0b2744 0,transparent 28%),var(--bg)}
 .app.desktop-mode #pageDesktop{display:block!important}
 .bottom-nav{position:fixed;left:0;right:0;bottom:0;height:calc(68px + env(safe-area-inset-bottom));padding:5px 9px env(safe-area-inset-bottom);display:grid;grid-template-columns:repeat(4,1fr);background:#0b111bd9;backdrop-filter:blur(18px);border-top:1px solid #ffffff0c;z-index:50}.nav-btn{border:0;background:none;color:#7e8b9c;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}.nav-btn span{font-size:20px}.nav-btn small{font-size:9px}.nav-btn.active{color:#57aaff}
 @media(min-width:700px){.page{max-width:520px;margin:0 auto}.topbar{padding-left:max(15px,calc((100% - 520px)/2));padding-right:max(15px,calc((100% - 520px)/2))}.bottom-nav{left:50%;right:auto;width:520px;transform:translateX(-50%);border-left:1px solid #ffffff0c;border-right:1px solid #ffffff0c}}
+
+
+/* v1.1.1 iPhone navigation hit-target fix */
+.topbar{position:relative;z-index:60}
+.page{z-index:1;pointer-events:auto}
+.page:not(.active){display:none!important;pointer-events:none!important}
+.page.active{display:block!important;pointer-events:auto!important}
+.tile,.nav-btn,.back-btn,.icon-btn,.section-head button,.desktop-float-btn,.desktop-quick-menu button{
+  pointer-events:auto!important;
+  touch-action:manipulation;
+  cursor:pointer;
+}
+.tile,.nav-btn{position:relative;z-index:2}
+.bottom-nav{z-index:1000!important;pointer-events:auto!important}
+.app:not(.desktop-mode) .bottom-nav{display:grid!important}
+.app.desktop-mode .bottom-nav{display:none!important}
