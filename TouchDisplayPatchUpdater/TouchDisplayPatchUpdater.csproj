@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
-    <AssemblyName>TouchDisplay-Update-v1.2.6</AssemblyName>
+    <AssemblyName>TouchDisplay-Update-v1.2.7</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
