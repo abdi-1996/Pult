@@ -122,3 +122,16 @@ radial-gradient(circle at 100% 30%,#0b2744 0,transparent 28%),var(--bg)}
 .desktop-fullscreen-btn.active{background:rgba(10,92,190,.70);border-color:rgba(89,175,255,.7)}
 .desktop-fullscreen-btn:active,.desktop-exit-btn:active{transform:translateX(-50%) scale(.96)}
 .desktop-exit-btn:active{transform:scale(.94)}
+
+
+/* v1.2.7 — desktop always fills the phone; only the X button remains */
+.app.desktop-mode .desktop-fullscreen-btn{display:none!important}
+.app.desktop-mode .desktop-exit-btn{display:flex!important}
+.desktop-exit-btn{
+  top:calc(env(safe-area-inset-top) + 8px)!important;
+  right:10px!important;
+  width:42px!important;
+  height:42px!important;
+  z-index:100!important;
+  background:rgba(0,0,0,.38)!important;
+}
