@@ -194,7 +194,7 @@ internal sealed class RemoteServer
             gpu = new { percent = Math.Round(s.GpuPercent), memory = Math.Round(s.GpuMemoryPercent), name = s.GpuName },
             ram = new { percent = Math.Round(s.RamPercent), used = Math.Round(s.RamUsedGb, 1), total = Math.Round(s.RamTotalGb, 1) },
             network = new { down = Math.Round(s.DownMbps, 1), up = Math.Round(s.UpMbps, 1) },
-            version = "1.2.1"
+            version = "1.2.5"
         }, token);
     }
 
@@ -397,7 +397,8 @@ internal sealed class RemoteServer
         {
             _status($"iPhone/Web управление: {remote}", false);
             TouchController.Reset();
-            await ReceiveControlAsync(stream, token);
+            using var adaptiveDisplay = new AdaptiveDisplaySession(_status);
+            await ReceiveControlAsync(stream, adaptiveDisplay, token);
         }
         else
         {
@@ -455,7 +456,7 @@ internal sealed class RemoteServer
         return target;
     }
 
-    private static async Task ReceiveControlAsync(NetworkStream stream, CancellationToken token)
+    private static async Task ReceiveControlAsync(NetworkStream stream, AdaptiveDisplaySession adaptiveDisplay, CancellationToken token)
     {
         while (!token.IsCancellationRequested)
         {
@@ -477,6 +478,12 @@ internal sealed class RemoteServer
 
                 switch (t)
                 {
+                    case "profile":
+                        adaptiveDisplay.ApplyForClient(
+                            root.TryGetProperty("w", out var pw) ? pw.GetInt32() : 0,
+                            root.TryGetProperty("h", out var ph) ? ph.GetInt32() : 0,
+                            root.TryGetProperty("dpr", out var pd) ? pd.GetDouble() : 1.0);
+                        break;
                     case "touch":
                         TouchController.Inject(
                             root.GetProperty("a").GetString() ?? "move",
