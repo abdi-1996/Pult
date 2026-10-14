@@ -39,7 +39,7 @@ internal sealed class HostForm : Form
     {
         _pin = SettingsStore.LoadOrCreatePin();
 
-        Text = "TouchDisplay Mobile Web v1.0";
+        Text = "TouchDisplay Mobile Web v1.2";
         ClientSize = new Size(640, 455);
         MinimumSize = new Size(640, 455);
         StartPosition = FormStartPosition.CenterScreen;
@@ -52,7 +52,7 @@ internal sealed class HostForm : Form
         title.Size = new Size(575, 42);
         Controls.Add(title);
 
-        var sub = Label("Отдельная веб-версия • iPhone / Android / Windows • Tailscale", 10.5f, FontStyle.Regular, Color.FromArgb(170, 180, 194));
+        var sub = Label("Версия с отдельными файлами • безопасные обновления • Tailscale", 10.5f, FontStyle.Regular, Color.FromArgb(170, 180, 194));
         sub.Location = new Point(30, 68);
         sub.Size = new Size(575, 28);
         Controls.Add(sub);
