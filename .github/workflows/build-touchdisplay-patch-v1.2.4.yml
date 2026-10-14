@@ -1,0 +1,30 @@
+name: Build TouchDisplay UI Patch v1.2.4
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [touchdisplay-mobile-web-v1]
+    paths:
+      - 'TouchDisplayMobileWeb/wwwroot/**'
+      - 'TouchDisplayPatchUpdater/**'
+      - '.github/workflows/build-touchdisplay-patch-v1.2.4.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build patch updater
+        shell: pwsh
+        run: |
+          dotnet restore TouchDisplayPatchUpdater/TouchDisplayPatchUpdater.csproj
+          dotnet publish TouchDisplayPatchUpdater/TouchDisplayPatchUpdater.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o out
+          Copy-Item out/TouchDisplay-Update-v1.2.4.exe TouchDisplay-Update-v1.2.4.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TouchDisplay-Update-v1.2.4
+          path: TouchDisplay-Update-v1.2.4.exe
+          retention-days: 30
