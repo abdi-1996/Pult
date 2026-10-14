@@ -93,6 +93,18 @@ internal static class MouseController
         NativeMethods.SetCursorPos(x, y);
     }
 
+    public static void RightClickAt(float nx, float ny, Rectangle bounds)
+    {
+        if (!float.IsFinite(nx) || !float.IsFinite(ny)) return;
+        nx = Math.Clamp(nx, 0f, 1f);
+        ny = Math.Clamp(ny, 0f, 1f);
+        var x = Math.Clamp(bounds.Left + (int)Math.Round(nx * Math.Max(1, bounds.Width - 1)), bounds.Left, bounds.Right - 1);
+        var y = Math.Clamp(bounds.Top + (int)Math.Round(ny * Math.Max(1, bounds.Height - 1)), bounds.Top, bounds.Bottom - 1);
+        NativeMethods.SetCursorPos(x, y);
+        NativeMethods.mouse_event(RightDown, 0, 0, 0, UIntPtr.Zero);
+        NativeMethods.mouse_event(RightUp, 0, 0, 0, UIntPtr.Zero);
+    }
+
     public static void Button(int button, int action)
     {
         var down = button == 1 ? RightDown : LeftDown;
