@@ -141,27 +141,27 @@ internal sealed class RemoteServer
 
         if (path is "/" or "/index.html")
         {
-            await SendEmbeddedAsync(stream, "index.html", "text/html; charset=utf-8", token);
+            await SendStaticAsync(stream, "index.html", "text/html; charset=utf-8", token);
             return;
         }
         if (path == "/app.css")
         {
-            await SendEmbeddedAsync(stream, "app.css", "text/css; charset=utf-8", token);
+            await SendStaticAsync(stream, "app.css", "text/css; charset=utf-8", token);
             return;
         }
         if (path == "/app.js")
         {
-            await SendEmbeddedAsync(stream, "app.js", "application/javascript; charset=utf-8", token);
+            await SendStaticAsync(stream, "app.js", "application/javascript; charset=utf-8", token);
             return;
         }
         if (path == "/manifest.webmanifest")
         {
-            await SendEmbeddedAsync(stream, "manifest.webmanifest", "application/manifest+json; charset=utf-8", token);
+            await SendStaticAsync(stream, "manifest.webmanifest", "application/manifest+json; charset=utf-8", token);
             return;
         }
         if (path == "/icon.svg")
         {
-            await SendEmbeddedAsync(stream, "icon.svg", "image/svg+xml; charset=utf-8", token);
+            await SendStaticAsync(stream, "icon.svg", "image/svg+xml; charset=utf-8", token);
             return;
         }
 
@@ -194,7 +194,7 @@ internal sealed class RemoteServer
             gpu = new { percent = Math.Round(s.GpuPercent), memory = Math.Round(s.GpuMemoryPercent), name = s.GpuName },
             ram = new { percent = Math.Round(s.RamPercent), used = Math.Round(s.RamUsedGb, 1), total = Math.Round(s.RamTotalGb, 1) },
             network = new { down = Math.Round(s.DownMbps, 1), up = Math.Round(s.UpMbps, 1) },
-            version = "1.1.1"
+            version = "1.2"
         }, token);
     }
 
@@ -352,27 +352,21 @@ internal sealed class RemoteServer
         _ => "application/octet-stream"
     };
 
-    private async Task SendEmbeddedAsync(NetworkStream stream, string suffix, string contentType, CancellationToken token)
+    private async Task SendStaticAsync(NetworkStream stream, string suffix, string contentType, CancellationToken token)
     {
-        var asm = Assembly.GetExecutingAssembly();
-        var name = asm.GetManifestResourceNames().FirstOrDefault(x => x.EndsWith("wwwroot." + suffix.Replace('/', '.'), StringComparison.OrdinalIgnoreCase));
-        if (name is null)
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "wwwroot"));
+        var path = Path.GetFullPath(Path.Combine(root, suffix.Replace('/', Path.DirectorySeparatorChar)));
+        if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
         {
             await HttpResponse.TextAsync(stream, 404, "Resource missing", token);
             return;
         }
 
-        await using var rs = asm.GetManifestResourceStream(name);
-        if (rs is null)
-        {
-            await HttpResponse.TextAsync(stream, 404, "Resource missing", token);
-            return;
-        }
-
-        using var ms = new MemoryStream();
-        await rs.CopyToAsync(ms, token);
-        await HttpResponse.BytesAsync(stream, 200, contentType, ms.ToArray(), token,
-            suffix is "index.html" or "app.js" or "app.css" ? "Cache-Control: no-store\r\n" : "Cache-Control: public, max-age=3600\r\n");
+        var extra = suffix is "index.html" or "app.js" or "app.css"
+            ? "Cache-Control: no-store\r\n"
+            : "Cache-Control: public, max-age=3600\r\n";
+        var bytes = await File.ReadAllBytesAsync(path, token);
+        await HttpResponse.BytesAsync(stream, 200, contentType, bytes, token, extra);
     }
 
     private async Task HandleWebSocketAsync(NetworkStream stream, HttpRequest req, IPAddress remote, CancellationToken token)
