@@ -16,7 +16,10 @@
     decoding: false,
     statsTimer: null,
     latency: null,
-    desktopFill: true
+    desktopFill: true,
+    desktopGeneration: 0,
+    desktopReconnectTimer: null,
+    desktopSuspended: false
   };
 
   const login = $('#login'), app = $('#app'), pinInput = $('#pin'), loginError = $('#loginError');
@@ -127,6 +130,7 @@
     if (name === 'gallery') loadRecent();
     if (desktopMode) {
       state.desktopFill = true;
+      state.desktopSuspended = false;
       startDesktop();
     } else {
       stopDesktop();
@@ -237,28 +241,109 @@
     return proto + '//' + location.host + path + '?pin=' + encodeURIComponent(state.pin);
   }
 
+  function desktopIsActive() {
+    return $('#pageDesktop')?.classList.contains('active') === true;
+  }
+
+  function clearDesktopReconnect() {
+    if (state.desktopReconnectTimer) {
+      clearTimeout(state.desktopReconnectTimer);
+      state.desktopReconnectTimer = null;
+    }
+  }
+
+  function scheduleDesktopReconnect(delay=700) {
+    clearDesktopReconnect();
+    if (document.hidden || state.desktopSuspended || !desktopIsActive()) return;
+
+    const generation = state.desktopGeneration;
+    $('#desktopConnecting').textContent='Переподключение…';
+    $('#desktopConnecting').style.display='grid';
+
+    state.desktopReconnectTimer=setTimeout(()=>{
+      state.desktopReconnectTimer=null;
+      if (generation !== state.desktopGeneration) return;
+      if (document.hidden || state.desktopSuspended || !desktopIsActive()) return;
+      stopDesktop(false);
+      startDesktop();
+    },delay);
+  }
+
   function startDesktop() {
-    if (state.video || state.control) return;
-    $('#desktopConnecting').style.display = 'grid';
+    if (document.hidden || state.desktopSuspended || !desktopIsActive()) return;
+
+    const videoAlive = state.video && (state.video.readyState === WebSocket.OPEN || state.video.readyState === WebSocket.CONNECTING);
+    const controlAlive = state.control && (state.control.readyState === WebSocket.OPEN || state.control.readyState === WebSocket.CONNECTING);
+    if (videoAlive && controlAlive) return;
+
+    clearDesktopReconnect();
+    const generation = ++state.desktopGeneration;
+
+    try{state.video?.close()}catch{}
+    try{state.control?.close()}catch{}
+    state.video=null;
+    state.control=null;
+
+    const connecting=$('#desktopConnecting');
+    connecting.textContent='Подключение к экрану…';
+    connecting.style.display='grid';
+
     const v = new WebSocket(wsUrl('/ws/video'));
     const c = new WebSocket(wsUrl('/ws/control'));
     v.binaryType = 'arraybuffer';
-    state.video = v; state.control = c;
+    state.video = v;
+    state.control = c;
 
     let vo=false,co=false;
-    const ready=()=>{if(vo&&co)$('#desktopConnecting').style.display='none'};
-    v.onopen=()=>{vo=true;ready()};
-    c.onopen=()=>{co=true;sendDisplayProfile();ready()};
-    v.onmessage=e=>queueFrame(e.data);
-    const closed=()=>{ if ($('#pageDesktop').classList.contains('active')) { $('#desktopConnecting').textContent='Переподключение…'; $('#desktopConnecting').style.display='grid'; setTimeout(()=>{stopDesktop();startDesktop()},900); } };
-    v.onclose=closed; c.onclose=closed; v.onerror=()=>{}; c.onerror=()=>{};
+    const ready=()=>{
+      if(generation!==state.desktopGeneration)return;
+      if(vo&&co){
+        connecting.style.display='none';
+        connecting.textContent='Подключение к экрану…';
+      }
+    };
+
+    v.onopen=()=>{
+      if(generation!==state.desktopGeneration)return;
+      vo=true;
+      ready();
+    };
+    c.onopen=()=>{
+      if(generation!==state.desktopGeneration)return;
+      co=true;
+      sendDisplayProfile();
+      ready();
+    };
+    v.onmessage=e=>{
+      if(generation===state.desktopGeneration)queueFrame(e.data);
+    };
+
+    const closed=()=>{
+      if(generation!==state.desktopGeneration)return;
+      if(state.video===v)state.video=null;
+      if(state.control===c)state.control=null;
+      scheduleDesktopReconnect(750);
+    };
+
+    v.onclose=closed;
+    c.onclose=closed;
+    v.onerror=()=>{};
+    c.onerror=()=>{};
     updateModeButton();
   }
 
-  function stopDesktop() {
-    try{state.video?.close()}catch{}
-    try{state.control?.close()}catch{}
-    state.video=null; state.control=null;
+  function stopDesktop(invalidate=true) {
+    clearDesktopReconnect();
+    if(invalidate) state.desktopGeneration++;
+
+    const v=state.video;
+    const c=state.control;
+    state.video=null;
+    state.control=null;
+
+    if(v){v.onclose=null;v.onerror=null;try{v.close()}catch{}}
+    if(c){c.onclose=null;c.onerror=null;try{c.close()}catch{}}
+
     state.pointers.forEach(p=>{if(p.longTimer)clearTimeout(p.longTimer)});
     state.pointers.clear();
   }
@@ -438,7 +523,52 @@
   sink.addEventListener('input',()=>{if(sink.value){send({t:'text',v:sink.value});sink.value=''}});
   sink.addEventListener('keydown',e=>{if(['Enter','Backspace','Escape','Tab','Delete','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(e.key)){send({t:'key',v:e.key});e.preventDefault()}});
 
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)stopDesktop();else if($('#pageDesktop').classList.contains('active'))startDesktop()});
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){
+      // iOS/PWA may suspend WebSockets while in the background.
+      // Never reconnect while hidden: that caused the endless "Переподключение…" loop.
+      state.desktopSuspended=true;
+      clearDesktopReconnect();
+      return;
+    }
+
+    if(desktopIsActive()){
+      state.desktopSuspended=false;
+
+      // Give iOS a moment to restore the page, then make exactly one clean reconnect
+      // if either socket died while the app was minimized.
+      setTimeout(()=>{
+        if(document.hidden || !desktopIsActive())return;
+        const vOk=state.video?.readyState===WebSocket.OPEN;
+        const cOk=state.control?.readyState===WebSocket.OPEN;
+        if(vOk&&cOk){
+          sendDisplayProfile();
+          $('#desktopConnecting').style.display='none';
+        }else{
+          stopDesktop(true);
+          startDesktop();
+        }
+      },250);
+    }
+  });
+
+  window.addEventListener('pageshow',()=>{
+    if(document.hidden || !desktopIsActive())return;
+    state.desktopSuspended=false;
+    setTimeout(()=>{
+      const vOk=state.video?.readyState===WebSocket.OPEN;
+      const cOk=state.control?.readyState===WebSocket.OPEN;
+      if(!(vOk&&cOk)){
+        stopDesktop(true);
+        startDesktop();
+      }
+    },300);
+  });
+
+  window.addEventListener('pagehide',()=>{
+    state.desktopSuspended=true;
+    clearDesktopReconnect();
+  });
 
   function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   function escapeAttr(s){return escapeHtml(s).replace(/\n/g,' ')}
