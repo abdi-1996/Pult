@@ -26,28 +26,28 @@ internal static class Program
                 MessageBox.Show(
                     "В выбранной папке не найдена версия TouchDisplay с отдельными файлами.\n\n" +
                     "Сначала должна быть установлена версия v1.2.",
-                    "TouchDisplay Update v1.2.12",
+                    "TouchDisplay Update v1.2.13",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
                 return;
             }
 
             if (MessageBox.Show(
-                "Включить автоматический запуск TouchDisplay вместе с Windows?\n\n" +
+                "Исправить зависание рабочего стола после сворачивания приложения?\n\n" +
                 "Будут обновлены файлы Adaptive Display и интерфейса:\n" +
                 "• TouchDisplayMobileWeb.dll\n" +
                 "• wwwroot\\app.js\n" +
                 "• wwwroot\\app.css\n" +
                 "• wwwroot\\index.html\n\n" +
                 "PIN, настройки и остальные файлы приложения не меняются.",
-                "TouchDisplay Update v1.2.12",
+                "TouchDisplay Update v1.2.13",
                 MessageBoxButtons.OKCancel,
                 MessageBoxIcon.Information) != DialogResult.OK)
                 return;
 
             StopApp(target);
 
-            var backup = Path.Combine(target, "Backup", "ui-v1.2.12-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+            var backup = Path.Combine(target, "Backup", "ui-v1.2.13-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
             Directory.CreateDirectory(backup);
 
             PatchRootFile(target, backup, "TouchDisplayMobileWeb.dll", "TouchDisplayPatch.TouchDisplayMobileWeb.dll");
@@ -57,7 +57,7 @@ internal static class Program
 
             var data = Path.Combine(target, "data");
             Directory.CreateDirectory(data);
-            File.WriteAllText(Path.Combine(data, "version.txt"), "1.2.12");
+            File.WriteAllText(Path.Combine(data, "version.txt"), "1.2.13");
 
             EnableAutoStart(target);
 
@@ -78,9 +78,9 @@ internal static class Program
 
             MessageBox.Show(
                 "Готово.\n\n" +
-                "TouchDisplay теперь автоматически запускается после входа в Windows и сразу работает в фоне в системном трее. Окно программы при автозапуске не мешает работе. Двойной клик по значку в трее открывает TouchDisplay.\n\n" +
+                "Исправлено восстановление рабочего стола после сворачивания iPhone/PWA. TouchDisplay больше не будет запускать несколько циклов переподключения одновременно: в фоне переподключение блокируется, а после возврата выполняется только одно восстановление соединения.\n\n" +
                 "На iPhone полностью закрой старую вкладку/PWA TouchDisplay и открой снова.",
-                "TouchDisplay v1.2.12",
+                "TouchDisplay v1.2.13",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         }
@@ -88,7 +88,7 @@ internal static class Program
         {
             MessageBox.Show(
                 "Не удалось установить обновление.\n\n" + ex.Message,
-                "TouchDisplay Update v1.2.12",
+                "TouchDisplay Update v1.2.13",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
@@ -100,7 +100,7 @@ internal static class Program
 
         using var form = new Form
         {
-            Text = "TouchDisplay Update v1.2.12",
+            Text = "TouchDisplay Update v1.2.13",
             ClientSize = new Size(660, 210),
             FormBorderStyle = FormBorderStyle.FixedDialog,
             MaximizeBox = false,
