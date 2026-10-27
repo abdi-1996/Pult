@@ -19,7 +19,8 @@
     desktopFill: true,
     desktopGeneration: 0,
     desktopReconnectTimer: null,
-    desktopSuspended: false
+    desktopSuspended: false,
+    desktopWasOpenBeforeBackground: false
   };
 
   const login = $('#login'), app = $('#app'), pinInput = $('#pin'), loginError = $('#loginError');
@@ -525,47 +526,47 @@
 
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden){
-      // iOS/PWA may suspend WebSockets while in the background.
-      // Never reconnect while hidden: that caused the endless "Переподключение…" loop.
-      state.desktopSuspended=true;
+      // Preserve the desktop session while the browser is backgrounded.
+      // Do not close healthy sockets or recreate the screen profile on resume.
+      state.desktopWasOpenBeforeBackground = desktopIsActive();
+      state.desktopSuspended = true;
       clearDesktopReconnect();
       return;
     }
 
     if(desktopIsActive()){
-      state.desktopSuspended=false;
-
-      // Give iOS a moment to restore the page, then make exactly one clean reconnect
-      // if either socket died while the app was minimized.
-      setTimeout(()=>{
-        if(document.hidden || !desktopIsActive())return;
-        const vOk=state.video?.readyState===WebSocket.OPEN;
-        const cOk=state.control?.readyState===WebSocket.OPEN;
-        if(vOk&&cOk){
-          sendDisplayProfile();
-          $('#desktopConnecting').style.display='none';
-        }else{
-          stopDesktop(true);
-          startDesktop();
-        }
-      },250);
+      state.desktopSuspended = false;
+      const vOk=state.video?.readyState===WebSocket.OPEN;
+      const cOk=state.control?.readyState===WebSocket.OPEN;
+      if(vOk&&cOk){
+        // Keep the same desktop session and display mode.
+        $('#desktopConnecting').style.display='none';
+        if(state.desktopWasOpenBeforeBackground) sendDisplayProfile();
+      } else {
+        stopDesktop(true);
+        startDesktop();
+      }
+      state.desktopWasOpenBeforeBackground = false;
     }
   });
 
   window.addEventListener('pageshow',()=>{
     if(document.hidden || !desktopIsActive())return;
     state.desktopSuspended=false;
-    setTimeout(()=>{
-      const vOk=state.video?.readyState===WebSocket.OPEN;
-      const cOk=state.control?.readyState===WebSocket.OPEN;
-      if(!(vOk&&cOk)){
-        stopDesktop(true);
-        startDesktop();
-      }
-    },300);
+    const vOk=state.video?.readyState===WebSocket.OPEN;
+    const cOk=state.control?.readyState===WebSocket.OPEN;
+    if(vOk&&cOk){
+      $('#desktopConnecting').style.display='none';
+    }else{
+      stopDesktop(true);
+      startDesktop();
+    }
   });
 
   window.addEventListener('pagehide',()=>{
+    // Avoid reconnect loops while iOS suspends the web app.
+    // Leave sockets alone; the OS/browser decides if they remain alive.
+    state.desktopWasOpenBeforeBackground = desktopIsActive();
     state.desktopSuspended=true;
     clearDesktopReconnect();
   });
