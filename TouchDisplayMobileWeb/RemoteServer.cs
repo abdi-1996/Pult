@@ -18,6 +18,10 @@ internal sealed class RemoteServer
     private readonly SystemStats _stats = new();
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
+    private readonly object _displayLock = new();
+    private AdaptiveDisplaySession? _displaySession;
+    private CancellationTokenSource? _displayRestoreDelay;
+    private int _controlClients;
 
     private static readonly ImageCodecInfo JpegCodec =
         ImageCodecInfo.GetImageEncoders().First(x => x.FormatID == ImageFormat.Jpeg.Guid);
@@ -45,7 +49,52 @@ internal sealed class RemoteServer
         _listener = null;
         _cts?.Dispose();
         _cts = null;
+        lock (_displayLock)
+        {
+            _displayRestoreDelay?.Cancel();
+            _displayRestoreDelay?.Dispose();
+            _displayRestoreDelay = null;
+            _displaySession?.Dispose();
+            _displaySession = null;
+            _controlClients = 0;
+        }
         TouchController.Reset();
+    }
+
+    private AdaptiveDisplaySession AcquireDisplay()
+    {
+        lock (_displayLock)
+        {
+            _displayRestoreDelay?.Cancel();
+            _displayRestoreDelay?.Dispose();
+            _displayRestoreDelay = null;
+            _controlClients++;
+            return _displaySession ??= new AdaptiveDisplaySession(_status);
+        }
+    }
+
+    private void ReleaseDisplay()
+    {
+        lock (_displayLock)
+        {
+            if (--_controlClients > 0) return;
+            _controlClients = 0;
+            var delay = new CancellationTokenSource();
+            _displayRestoreDelay = delay;
+            _ = Task.Run(async () =>
+            {
+                try { await Task.Delay(TimeSpan.FromSeconds(60), delay.Token); }
+                catch (OperationCanceledException) { return; }
+                lock (_displayLock)
+                {
+                    if (_controlClients != 0 || _displayRestoreDelay != delay) return;
+                    _displaySession?.Dispose();
+                    _displaySession = null;
+                    _displayRestoreDelay = null;
+                    delay.Dispose();
+                }
+            });
+        }
     }
 
     private async Task AcceptLoopAsync(CancellationToken token)
@@ -194,7 +243,7 @@ internal sealed class RemoteServer
             gpu = new { percent = Math.Round(s.GpuPercent), memory = Math.Round(s.GpuMemoryPercent), name = s.GpuName },
             ram = new { percent = Math.Round(s.RamPercent), used = Math.Round(s.RamUsedGb, 1), total = Math.Round(s.RamTotalGb, 1) },
             network = new { down = Math.Round(s.DownMbps, 1), up = Math.Round(s.UpMbps, 1) },
-            version = "1.2.14"
+            version = "1.2.15"
         }, token);
     }
 
@@ -397,8 +446,9 @@ internal sealed class RemoteServer
         {
             _status($"iPhone/Web управление: {remote}", false);
             TouchController.Reset();
-            using var adaptiveDisplay = new AdaptiveDisplaySession(_status);
-            await ReceiveControlAsync(stream, adaptiveDisplay, token);
+            var adaptiveDisplay = AcquireDisplay();
+            try { await ReceiveControlAsync(stream, adaptiveDisplay, token); }
+            finally { ReleaseDisplay(); }
         }
         else
         {
