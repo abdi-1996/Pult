@@ -295,10 +295,15 @@
     state.video = v;
     state.control = c;
 
-    let vo=false,co=false;
+    let vo=false,co=false,firstFrame=false;
+    let frameWatchdog=null;
+    const clearWatchdog=()=>{if(frameWatchdog){clearTimeout(frameWatchdog);frameWatchdog=null}};
+    frameWatchdog=setTimeout(()=>{
+      if(generation===state.desktopGeneration && !firstFrame && !document.hidden && !state.desktopSuspended) scheduleDesktopReconnect(100);
+    },6500);
     const ready=()=>{
       if(generation!==state.desktopGeneration)return;
-      if(vo&&co){
+      if(vo&&co&&firstFrame){
         connecting.style.display='none';
         connecting.textContent='Подключение к экрану…';
       }
@@ -316,10 +321,15 @@
       ready();
     };
     v.onmessage=e=>{
-      if(generation===state.desktopGeneration)queueFrame(e.data);
+      if(generation!==state.desktopGeneration)return;
+      firstFrame=true;
+      clearWatchdog();
+      queueFrame(e.data);
+      ready();
     };
 
     const closed=()=>{
+      clearWatchdog();
       if(generation!==state.desktopGeneration)return;
       if(state.video===v)state.video=null;
       if(state.control===c)state.control=null;
@@ -541,7 +551,7 @@
       if(vOk&&cOk){
         // Keep the same desktop session and display mode.
         $('#desktopConnecting').style.display='none';
-        if(state.desktopWasOpenBeforeBackground) sendDisplayProfile();
+        // Keep the existing server display profile unchanged on resume.
       } else {
         stopDesktop(true);
         startDesktop();
