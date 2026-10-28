@@ -26,7 +26,7 @@ internal static class Program
                 MessageBox.Show(
                     "В выбранной папке не найдена версия TouchDisplay с отдельными файлами.\n\n" +
                     "Сначала должна быть установлена версия v1.2.",
-                    "TouchDisplay Update v1.2.14",
+                    "TouchDisplay Update v1.2.15",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
                 return;
@@ -40,14 +40,14 @@ internal static class Program
                 "• wwwroot\\app.css\n" +
                 "• wwwroot\\index.html\n\n" +
                 "PIN, настройки и остальные файлы приложения не меняются.",
-                "TouchDisplay Update v1.2.14",
+                "TouchDisplay Update v1.2.15",
                 MessageBoxButtons.OKCancel,
                 MessageBoxIcon.Information) != DialogResult.OK)
                 return;
 
             StopApp(target);
 
-            var backup = Path.Combine(target, "Backup", "ui-v1.2.14-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+            var backup = Path.Combine(target, "Backup", "ui-v1.2.15-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
             Directory.CreateDirectory(backup);
 
             PatchRootFile(target, backup, "TouchDisplayMobileWeb.dll", "TouchDisplayPatch.TouchDisplayMobileWeb.dll");
@@ -57,7 +57,7 @@ internal static class Program
 
             var data = Path.Combine(target, "data");
             Directory.CreateDirectory(data);
-            File.WriteAllText(Path.Combine(data, "version.txt"), "1.2.14");
+            File.WriteAllText(Path.Combine(data, "version.txt"), "1.2.15");
 
             EnableAutoStart(target);
 
@@ -78,9 +78,9 @@ internal static class Program
 
             MessageBox.Show(
                 "Готово.\n\n" +
-                "Рабочий стол сохраняет текущие соединения при сворачивании приложения. При возврате программа не закрывает и не пересоздаёт живые соединения, поэтому экран и режим монитора не должны переключаться. Если iOS всё же закрыла соединение в фоне, оно восстановится только после возврата.\n\n" +
+                "Исправлено восстановление экрана после сворачивания. Режим монитора сохраняется 60 секунд при кратком обрыве управления; повторное подключение не переключает разрешение. Индикатор подключения исчезает после первого видеокадра.\n\n" +
                 "На iPhone полностью закрой старую вкладку/PWA TouchDisplay и открой снова.",
-                "TouchDisplay v1.2.14",
+                "TouchDisplay v1.2.15",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         }
@@ -88,7 +88,7 @@ internal static class Program
         {
             MessageBox.Show(
                 "Не удалось установить обновление.\n\n" + ex.Message,
-                "TouchDisplay Update v1.2.14",
+                "TouchDisplay Update v1.2.15",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
@@ -100,7 +100,7 @@ internal static class Program
 
         using var form = new Form
         {
-            Text = "TouchDisplay Update v1.2.14",
+            Text = "TouchDisplay Update v1.2.15",
             ClientSize = new Size(660, 210),
             FormBorderStyle = FormBorderStyle.FixedDialog,
             MaximizeBox = false,
